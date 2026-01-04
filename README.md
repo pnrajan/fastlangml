@@ -1,11 +1,19 @@
-# FastLangID
+# FastLangML
 
 [![PyPI](https://img.shields.io/pypi/v/fastlangml)](https://pypi.org/project/fastlangml/)
 [![Python](https://img.shields.io/pypi/pyversions/fastlangml)](https://pypi.org/project/fastlangml/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Language detection built for conversations.** FastLangID is optimized for short, conversational text like chat messages, SMS, and customer service interactions where traditional language detectors fail.
+**High-accuracy language detection for chat, SMS, and conversational text.** FastLangML combines multiple detection backends ([FastText](https://fasttext.cc/), [Lingua](https://github.com/pemistahl/lingua-py), [langdetect](https://github.com/Mimino666/langdetect), [pyCLD3](https://github.com/bsolomon1124/pycld3)) into a powerful ensemble that outperforms any single detector.
+
+**Key Features:**
+- **170+ languages** supported via multi-backend ensemble
+- **Context-aware detection** - tracks conversation history to resolve ambiguous short messages like "ok", "si", "bien"
+- **Code-switching detection** - identifies mixed-language messages (Spanglish, Franglais, Hinglish)
+- **Slang & abbreviations** - built-in hints for chat lingo ("thx", "mdr", "jaja")
+- **Confusion resolution** - handles similar language pairs (Spanish/Portuguese, Norwegian/Danish/Swedish)
+- **Extensible** - add custom backends, voting strategies, and hint dictionaries
 
 ## Table of Contents
 
@@ -49,7 +57,7 @@ Traditional language detectors are trained on well-formed sentences and document
 - Chat slang ("thx", "mdr", "jaja") isn't in training data
 - No context from surrounding messages
 
-**FastLangID solves this** by:
+**FastLangML solves this** by:
 1. Tracking conversation context to disambiguate short messages
 2. Using hint dictionaries for slang and common words
 3. Combining multiple detection backends for robustness
@@ -98,7 +106,7 @@ print(result.reliable)    # True
 
 ### Context-Aware Detection
 
-The key feature of FastLangID is **automatic context tracking**. When you pass a `ConversationContext`, the library:
+The key feature of FastLangML is **automatic context tracking**. When you pass a `ConversationContext`, the library:
 1. Remembers the last N detected languages
 2. Uses this history to resolve ambiguous messages
 3. Auto-updates the context after each detection
@@ -183,7 +191,7 @@ queue = route_message(messages)  # Returns "fr"
 
 ### Multi-Backend Ensemble
 
-FastLangID can combine multiple language detection backends for better accuracy. Each backend has different strengths:
+FastLangML can combine multiple language detection backends for better accuracy. Each backend has different strengths:
 
 | Backend | Best For | Weaknesses |
 |---------|----------|------------|
@@ -540,7 +548,7 @@ detector = FastLangDetector(
 
 ### Language Confusion Resolution
 
-FastLangID handles commonly confused language pairs with specialized logic:
+FastLangML handles commonly confused language pairs with specialized logic:
 
 **Supported confused pairs:**
 - Spanish / Portuguese
@@ -725,7 +733,7 @@ detector.set_languages(["en", "es"])
 
 ### 5. Handle "und" (Unknown)
 
-When FastLangID is uncertain, it returns `und` instead of guessing wrong:
+When FastLangML is uncertain, it returns `und` instead of guessing wrong:
 
 ```python
 result = detect("ok")

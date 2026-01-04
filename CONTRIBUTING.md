@@ -1,6 +1,6 @@
-# Contributing to FastLangID
+# Contributing to FastLangML
 
-Thank you for your interest in contributing to FastLangID! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to FastLangML! This document provides guidelines and instructions for contributing.
 
 ## Table of Contents
 
@@ -420,7 +420,7 @@ Describe how you tested your changes.
 ### Bug Reports
 
 Include:
-1. FastLangID version (`fastlangml --version`)
+1. FastLangML version (`fastlangml --version`)
 2. Python version (`python --version`)
 3. Operating system
 4. Installed backends
@@ -434,7 +434,7 @@ Include:
 Brief description of the bug.
 
 ## Environment
-- FastLangID version: x.x.x
+- FastLangML version: x.x.x
 - Python version: 3.x.x
 - OS: macOS/Linux/Windows
 - Backends installed: fasttext, lingua
@@ -493,4 +493,4 @@ We follow [Semantic Versioning](https://semver.org/):
 - Check existing issues for similar questions
 - Read the [documentation](README.md)
 
-Thank you for contributing to FastLangID!
+Thank you for contributing to FastLangML!
