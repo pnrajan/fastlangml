@@ -544,21 +544,6 @@ detector = FastLangDetector(
 )
 ```
 
----
-
-### Language Confusion Resolution
-
-FastLangML handles commonly confused language pairs with specialized logic:
-
-**Supported confused pairs:**
-- Spanish / Portuguese
-- Norwegian / Danish / Swedish
-- Czech / Slovak
-- Croatian / Serbian / Bosnian
-- Indonesian / Malay
-- Russian / Ukrainian / Belarusian
-- Hindi / Urdu
-
 ```python
 from fastlangml import ConfusionResolver, LanguageSimilarity
 
