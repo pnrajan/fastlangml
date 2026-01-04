@@ -66,6 +66,7 @@ dependencies = [
 
 [project.optional-dependencies]
 fasttext = ["fasttext-langdetect>=1.0.5", "numpy<2"]
+fastlangid = ["fastlangid>=1.0.11"]
 langdetect = ["langdetect>=1.0.9"]
 lingua = ["lingua-language-detector>=2.0.0"]
 pycld3 = ["pycld3>=0.22"]
@@ -74,6 +75,7 @@ spacy = ["spacy>=3.5.0", "en-core-web-sm @ https://github.com/explosion/spacy-mo
 fuzzy = ["rapidfuzz>=3.0.0"]
 all = [
     "fasttext-langdetect>=1.0.5",
+    "fastlangid>=1.0.11",
     "numpy<2",
     "langdetect>=1.0.9",
     "lingua-language-detector>=2.0.0",
@@ -137,3 +139,6 @@ warn_unused_configs = true
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
+markers = [
+    "benchmark: marks tests as benchmark tests (deselect with '-m \"not benchmark\"')",
+]

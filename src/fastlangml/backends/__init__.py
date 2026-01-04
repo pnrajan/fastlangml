@@ -49,13 +49,14 @@ _CUSTOM_BACKEND_REGISTRY: dict[str, type[Backend]] = {}
 
 _BACKEND_RELIABILITY: dict[str, int] = {
     "fasttext": 5,
+    "fastlangid": 5,
     "lingua": 4,
     "langid": 3,
     "pycld3": 3,
     "langdetect": 2,
 }
 
-_BUILTIN_BACKEND_NAMES = frozenset({"fasttext", "langdetect", "lingua", "pycld3", "langid"})
+_BUILTIN_BACKEND_NAMES = frozenset({"fasttext", "fastlangid", "langdetect", "lingua", "pycld3", "langid"})
 
 
 def backend(name: str, reliability: int = 3) -> Callable[[T], T]:
@@ -189,6 +190,9 @@ def _get_backend_class(name: str) -> type[Backend]:
     if name == "fasttext":
         from fastlangml.backends.fasttext_backend import FastTextBackend
         return FastTextBackend
+    elif name == "fastlangid":
+        from fastlangml.backends.fastlangid_backend import FastLangIDBackend
+        return FastLangIDBackend
     elif name == "langdetect":
         from fastlangml.backends.langdetect_backend import LangdetectBackend
         return LangdetectBackend
