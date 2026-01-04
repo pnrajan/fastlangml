@@ -8,7 +8,10 @@ actual content language.
 from __future__ import annotations
 
 import re
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    import spacy
 
 
 class ProperNounFilter:
@@ -17,13 +20,18 @@ class ProperNounFilter:
 
     Uses a combination of:
     1. Capitalization heuristics (lightweight, no dependencies)
-    2. Optional NLTK POS tagging (more accurate, requires NLTK)
+    2. Optional spaCy NER (most accurate, requires spaCy + model)
     """
+
+    # Entity types to filter (PERSON, ORG, GPE are most common proper nouns)
+    DEFAULT_ENTITY_TYPES = {"PERSON", "ORG", "GPE", "LOC", "FAC", "NORP"}
 
     def __init__(
         self,
         strategy: Literal["remove", "mask", "none"] = "remove",
-        use_nltk: bool = False,
+        use_spacy: bool = False,
+        spacy_model: str = "en_core_web_sm",
+        entity_types: set[str] | None = None,
     ) -> None:
         """
         Args:
@@ -31,10 +39,18 @@ class ProperNounFilter:
                 - "remove": Remove proper nouns from text
                 - "mask": Replace with [NAME] placeholder
                 - "none": Do not filter
-            use_nltk: Use NLTK for more accurate POS tagging
+            use_spacy: Use spaCy NER for accurate entity detection
+            spacy_model: spaCy model to use (default: en_core_web_sm)
+            entity_types: Entity types to filter. Default: PERSON, ORG, GPE, LOC, FAC, NORP
         """
         self._strategy = strategy
-        self._use_nltk = use_nltk and self._nltk_available()
+        self._use_spacy = use_spacy
+        self._spacy_model_name = spacy_model
+        self._entity_types = entity_types or self.DEFAULT_ENTITY_TYPES
+        self._nlp: spacy.Language | None = None
+
+        if use_spacy:
+            self._nlp = self._load_spacy_model()
 
         # Common title words to preserve (not proper nouns)
         self._common_words = {
@@ -59,15 +75,20 @@ class ProperNounFilter:
         # Pattern for potential proper nouns (capitalized words not at sentence start)
         self._proper_noun_pattern = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b")
 
-    def _nltk_available(self) -> bool:
-        """Check if NLTK with required data is available."""
+    def _load_spacy_model(self) -> spacy.Language | None:
+        """Load spaCy model for NER."""
         try:
-            import nltk
+            import spacy
 
-            nltk.data.find("taggers/averaged_perceptron_tagger")
-            return True
-        except (ImportError, LookupError):
-            return False
+            return spacy.load(self._spacy_model_name)
+        except (ImportError, OSError):
+            # spaCy not installed or model not found
+            return None
+
+    @property
+    def spacy_available(self) -> bool:
+        """Check if spaCy NER is available and loaded."""
+        return self._nlp is not None
 
     def filter(self, text: str) -> str:
         """
@@ -82,10 +103,36 @@ class ProperNounFilter:
         if self._strategy == "none":
             return text
 
-        if self._use_nltk:
-            return self._filter_with_nltk(text)
+        if self._use_spacy and self._nlp is not None:
+            return self._filter_with_spacy(text)
 
         return self._filter_with_heuristics(text)
+
+    def _filter_with_spacy(self, text: str) -> str:
+        """
+        spaCy NER-based proper noun filtering.
+
+        Uses named entity recognition to identify and filter entities
+        like PERSON, ORG, GPE (geopolitical entity), LOC, etc.
+        """
+        if self._nlp is None:
+            return self._filter_with_heuristics(text)
+
+        doc = self._nlp(text)
+        result = text
+
+        # Process entities in reverse order to preserve character positions
+        for ent in reversed(doc.ents):
+            if ent.label_ in self._entity_types:
+                if self._strategy == "mask":
+                    result = result[: ent.start_char] + "[NAME]" + result[ent.end_char :]
+                else:  # remove
+                    # Remove entity and cleanup extra spaces
+                    result = result[: ent.start_char] + result[ent.end_char :]
+
+        # Clean up multiple spaces
+        result = re.sub(r"\s+", " ", result).strip()
+        return result
 
     def _filter_with_heuristics(self, text: str) -> str:
         """
@@ -138,38 +185,8 @@ class ProperNounFilter:
 
         return " ".join(filtered_sentences)
 
-    def _filter_with_nltk(self, text: str) -> str:
-        """
-        NLTK POS-tag based proper noun filtering.
-
-        More accurate but requires NLTK data files.
-        """
-        import nltk
-
-        sentences = nltk.sent_tokenize(text)
-        filtered_sentences = []
-
-        for sentence in sentences:
-            words = nltk.word_tokenize(sentence)
-            pos_tags = nltk.pos_tag(words)
-
-            filtered_words = []
-            for word, tag in pos_tags:
-                # NNP = singular proper noun, NNPS = plural proper noun
-                if tag not in ("NNP", "NNPS"):
-                    filtered_words.append(word)
-                elif self._strategy == "mask":
-                    filtered_words.append("[NAME]")
-                # else: remove
-
-            if filtered_words:
-                # Reconstruct sentence (basic)
-                filtered_sentences.append(" ".join(filtered_words))
-
-        return " ".join(filtered_sentences)
-
     def _split_sentences(self, text: str) -> list[str]:
-        """Simple sentence splitting without NLTK."""
+        """Simple sentence splitting."""
         # Split on common sentence endings
         pattern = r"(?<=[.!?])\s+"
         sentences = re.split(pattern, text)
@@ -185,12 +202,9 @@ class ProperNounFilter:
         Returns:
             List of identified proper nouns
         """
-        if self._use_nltk:
-            import nltk
-
-            words = nltk.word_tokenize(text)
-            pos_tags = nltk.pos_tag(words)
-            return [word for word, tag in pos_tags if tag in ("NNP", "NNPS")]
+        if self._use_spacy and self._nlp is not None:
+            doc = self._nlp(text)
+            return [ent.text for ent in doc.ents if ent.label_ in self._entity_types]
 
         # Heuristic approach
         matches = self._proper_noun_pattern.findall(text)

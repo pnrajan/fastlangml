@@ -67,7 +67,7 @@ langdetect = ["langdetect>=1.0.9"]
 lingua = ["lingua-language-detector>=2.0.0"]
 pycld3 = ["pycld3>=0.22"]
 langid = ["langid>=1.1.6"]
-nltk = ["nltk>=3.8"]
+spacy = ["spacy>=3.5.0", "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"]
 fuzzy = ["rapidfuzz>=3.0.0"]
 all = [
     "fasttext-langdetect>=1.0.5",
@@ -76,6 +76,8 @@ all = [
     "lingua-language-detector>=2.0.0",
     "pycld3>=0.22",
     "langid>=1.1.6",
+    "spacy>=3.5.0",
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
     "rapidfuzz>=3.0.0",
 ]
 toml = ["tomli-w>=1.0.0"]

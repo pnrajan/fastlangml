@@ -87,6 +87,14 @@ pip install fastlangml[langdetect]
 | lingua | 75 | Medium | Very High | `[lingua]` |
 | langdetect | 55 | Fast | Medium | `[langdetect]` |
 | pycld3 | 107 | Very Fast | Medium | `[pycld3]` |
+| langid | 97 | Fast | Medium | `[langid]` |
+
+**Optional features:**
+
+| Feature | Description | Install Extra |
+|---------|-------------|---------------|
+| spaCy NER | Named entity recognition for proper noun filtering | `[spacy]` |
+| fuzzy | Fuzzy matching for hint dictionaries | `[fuzzy]` |
 
 ---
 
@@ -436,8 +444,12 @@ config = DetectionConfig(
     min_text_length=1,
 
     # Features
-    filter_proper_nouns=False,
+    filter_proper_nouns=False,  # Enable heuristic-based proper noun filtering
     use_script_filter=True,
+
+    # spaCy NER for proper noun filtering (requires pip install fastlangml[spacy])
+    # filter = ProperNounFilter(use_spacy=True)
+    # Filters: PERSON, ORG, GPE, LOC, FAC, NORP entities
 
     # Weights
     hint_weight=1.5,

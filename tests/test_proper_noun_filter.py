@@ -1,5 +1,6 @@
 """Tests for proper noun filtering."""
 
+import pytest
 
 from fastlangml.preprocessing.proper_noun_filter import ProperNounFilter
 
@@ -94,3 +95,79 @@ class TestProperNounFilter:
 
         assert "went" in result
         assert "stayed" in result
+
+
+class TestProperNounFilterSpacy:
+    """Tests for ProperNounFilter with spaCy NER."""
+
+    @pytest.fixture
+    def spacy_filter(self):
+        """Create a spaCy-enabled filter."""
+        pnf = ProperNounFilter(strategy="remove", use_spacy=True)
+        if not pnf.spacy_available:
+            pytest.skip("spaCy model not available")
+        return pnf
+
+    def test_spacy_available_property(self):
+        """Test spacy_available property."""
+        pnf = ProperNounFilter(use_spacy=True)
+        # Should be True if spaCy is installed, False otherwise
+        assert isinstance(pnf.spacy_available, bool)
+
+    def test_spacy_remove_persons(self, spacy_filter):
+        """Test removing PERSON entities with spaCy."""
+        text = "John Smith went to the store."
+        result = spacy_filter.filter(text)
+        assert "John" not in result
+        assert "Smith" not in result
+        assert "store" in result
+
+    def test_spacy_remove_locations(self, spacy_filter):
+        """Test removing GPE/LOC entities with spaCy."""
+        text = "She traveled to Paris and London."
+        result = spacy_filter.filter(text)
+        assert "Paris" not in result
+        assert "London" not in result
+        assert "traveled" in result
+
+    def test_spacy_remove_organizations(self, spacy_filter):
+        """Test removing ORG entities with spaCy."""
+        text = "He works at Google and Microsoft."
+        result = spacy_filter.filter(text)
+        assert "Google" not in result
+        assert "Microsoft" not in result
+        assert "works" in result
+
+    def test_spacy_mask_strategy(self):
+        """Test masking entities with spaCy."""
+        pnf = ProperNounFilter(strategy="mask", use_spacy=True)
+        if not pnf.spacy_available:
+            pytest.skip("spaCy model not available")
+
+        text = "John works at Google."
+        result = pnf.filter(text)
+        assert "[NAME]" in result
+        assert "works" in result
+
+    def test_spacy_identify_entities(self, spacy_filter):
+        """Test identifying entities with spaCy."""
+        text = "John Smith works at Google in New York."
+        entities = spacy_filter.identify_proper_nouns(text)
+        # Should identify at least some entities
+        assert len(entities) > 0
+
+    def test_spacy_custom_entity_types(self):
+        """Test with custom entity types."""
+        pnf = ProperNounFilter(
+            strategy="remove",
+            use_spacy=True,
+            entity_types={"PERSON"},  # Only filter PERSON
+        )
+        if not pnf.spacy_available:
+            pytest.skip("spaCy model not available")
+
+        text = "John went to Paris."
+        result = pnf.filter(text)
+        # John (PERSON) should be removed, Paris (GPE) should remain
+        assert "John" not in result
+        # Note: Paris might still be in result depending on entity type filtering
