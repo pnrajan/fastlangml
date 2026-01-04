@@ -2,15 +2,15 @@
 
 import pytest
 
-from fastlangid.detector import (
+from fastlangml.context.conversation import ConversationContext
+from fastlangml.detector import (
+    DetectionConfig,
     FastLangDetector,
     FastLangDetectorBuilder,
-    DetectionConfig,
 )
-from fastlangid.result import DetectionResult, Candidate
-from fastlangid.context.conversation import ConversationContext
-from fastlangid.hints.dictionary import HintDictionary
-from fastlangid.exceptions import NoBackendsAvailableError
+from fastlangml.exceptions import NoBackendsAvailableError
+from fastlangml.hints.dictionary import HintDictionary
+from fastlangml.result import DetectionResult
 
 
 class TestFastLangDetector:

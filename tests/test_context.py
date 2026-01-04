@@ -1,8 +1,7 @@
 """Tests for conversation context."""
 
-import pytest
 
-from fastlangid.context.conversation import ConversationContext, ConversationTurn
+from fastlangml.context.conversation import ConversationContext
 
 
 class TestConversationContext:
