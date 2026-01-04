@@ -9,15 +9,16 @@ from typing import NamedTuple
 
 import pytest
 
+from fastlangml import ConversationContext, FastLangDetector
+from fastlangml.codeswitching import CodeSwitchDetector
+
 # Mark all tests in this module as benchmark tests (slow)
 pytestmark = pytest.mark.benchmark
-
-from fastlangml import FastLangDetector, ConversationContext
-from fastlangml.codeswitching import CodeSwitchDetector
 
 
 class BenchmarkCase(NamedTuple):
     """Test case for benchmarks."""
+
     text: str
     expected: str
     category: str = "general"
@@ -49,14 +50,12 @@ STANDARD_TESTS = [
     BenchmarkCase("Hei, hvordan har du det?", "no", "european"),
     BenchmarkCase("Hej, hvordan går det?", "da", "european"),
     BenchmarkCase("Hei, mitä kuuluu?", "fi", "european"),
-
     # Cyrillic languages
     BenchmarkCase("Привет, как дела?", "ru", "cyrillic"),
     BenchmarkCase("Доброе утро, надеюсь у вас всё хорошо.", "ru", "cyrillic"),
     BenchmarkCase("Привіт, як справи?", "uk", "cyrillic"),
     BenchmarkCase("Добрий ранок, сподіваюся у вас все добре.", "uk", "cyrillic"),
     BenchmarkCase("Здравейте, как сте?", "bg", "cyrillic"),
-
     # CJK languages
     BenchmarkCase("こんにちは、お元気ですか？", "ja", "cjk"),
     BenchmarkCase("今日はとても良い天気ですね。", "ja", "cjk"),
@@ -64,24 +63,20 @@ STANDARD_TESTS = [
     BenchmarkCase("今天天气非常好。", "zh", "cjk"),
     BenchmarkCase("안녕하세요, 어떻게 지내세요?", "ko", "cjk"),
     BenchmarkCase("오늘 날씨가 정말 좋네요.", "ko", "cjk"),
-
     # RTL languages
     BenchmarkCase("مرحبا، كيف حالك؟", "ar", "rtl"),
     BenchmarkCase("صباح الخير، أتمنى لك يوماً سعيداً.", "ar", "rtl"),
     BenchmarkCase("שלום, מה שלומך?", "he", "rtl"),
     BenchmarkCase("בוקר טוב, מקווה שיהיה לך יום נפלא.", "he", "rtl"),
     BenchmarkCase("سلام، حال شما چطور است؟", "fa", "rtl"),
-
     # South Asian languages
     BenchmarkCase("नमस्ते, आप कैसे हैं?", "hi", "south_asian"),
     BenchmarkCase("আপনি কেমন আছেন?", "bn", "south_asian"),
     BenchmarkCase("நீங்கள் எப்படி இருக்கிறீர்கள்?", "ta", "south_asian"),
-
     # Southeast Asian languages
     BenchmarkCase("Xin chào, bạn có khỏe không?", "vi", "southeast_asian"),
     BenchmarkCase("Selamat pagi, apa kabar?", "id", "southeast_asian"),
     BenchmarkCase("สวัสดีครับ คุณสบายดีไหม", "th", "southeast_asian"),
-
     # Other languages
     BenchmarkCase("Merhaba, nasılsın?", "tr", "other"),
     BenchmarkCase("Γεια σου, πώς είσαι;", "el", "other"),
@@ -104,7 +99,6 @@ SHORT_TEXT_TESTS = [
     BenchmarkCase("こんにちは", "ja", "greeting"),
     BenchmarkCase("你好", "zh", "greeting"),
     BenchmarkCase("안녕", "ko", "greeting"),
-
     # Common responses
     BenchmarkCase("Yes please", "en", "response"),
     BenchmarkCase("No thanks", "en", "response"),
@@ -118,7 +112,6 @@ SHORT_TEXT_TESTS = [
     BenchmarkCase("Спасибо", "ru", "response"),
     BenchmarkCase("ありがとう", "ja", "response"),
     BenchmarkCase("谢谢", "zh", "response"),
-
     # Questions
     BenchmarkCase("How are you?", "en", "question"),
     BenchmarkCase("What time is it?", "en", "question"),
@@ -139,7 +132,7 @@ CONTEXT_TESTS = [
             ("Bonjour!", "fr"),
             ("Comment ça va?", "fr"),
             ("Bien", "fr"),  # Ambiguous without context
-            ("ok", "fr"),    # Ambiguous without context
+            ("ok", "fr"),  # Ambiguous without context
             ("merci", "fr"),
         ],
         "language": "fr",
@@ -160,7 +153,7 @@ CONTEXT_TESTS = [
         "messages": [
             ("Guten Tag!", "de"),
             ("Wie geht es Ihnen?", "de"),
-            ("Gut", "de"),   # Ambiguous
+            ("Gut", "de"),  # Ambiguous
             ("ok", "de"),
             ("danke", "de"),
         ],
@@ -185,11 +178,9 @@ CODE_SWITCHING_TESTS = [
     BenchmarkCase("That's muy importante for the proyecto", "mixed", "spanglish"),
     BenchmarkCase("I need to comprar some things from the tienda", "mixed", "spanglish"),
     BenchmarkCase("Let me llamar my friend real quick", "mixed", "spanglish"),
-
     # Franglais
     BenchmarkCase("C'est very nice de te voir", "mixed", "franglais"),
     BenchmarkCase("Je suis so excited pour tonight", "mixed", "franglais"),
-
     # Hinglish
     BenchmarkCase("Main bahut busy hoon today", "mixed", "hinglish"),
     BenchmarkCase("That was bahut accha performance", "mixed", "hinglish"),
@@ -199,6 +190,7 @@ CODE_SWITCHING_TESTS = [
 # =============================================================================
 # Benchmark Tests
 # =============================================================================
+
 
 class TestAccuracyBenchmarks:
     """Accuracy benchmark tests."""
@@ -225,7 +217,7 @@ class TestAccuracyBenchmarks:
                 failures.append((test.text[:30], test.expected, result.lang))
 
         accuracy = correct / total * 100
-        print(f"\n=== Standard Language Accuracy ===")
+        print("\n=== Standard Language Accuracy ===")
         print(f"Accuracy: {accuracy:.1f}% ({correct}/{total})")
 
         if failures:
@@ -250,7 +242,7 @@ class TestAccuracyBenchmarks:
                 failures.append((test.text, test.expected, result.lang))
 
         accuracy = correct / total * 100
-        print(f"\n=== Short Text Accuracy ===")
+        print("\n=== Short Text Accuracy ===")
         print(f"Accuracy: {accuracy:.1f}% ({correct}/{total})")
 
         if failures:
@@ -274,7 +266,7 @@ class TestAccuracyBenchmarks:
             if result.lang == test.expected:
                 categories[test.category]["correct"] += 1
 
-        print(f"\n=== Accuracy by Category ===")
+        print("\n=== Accuracy by Category ===")
         for category, data in sorted(categories.items()):
             acc = data["correct"] / data["total"] * 100
             print(f"  {category}: {acc:.1f}% ({data['correct']}/{data['total']})")
@@ -292,7 +284,7 @@ class TestAccuracyBenchmarks:
                 correct += 1
 
         accuracy = correct / len(cjk_tests) * 100
-        print(f"\n=== CJK Accuracy ===")
+        print("\n=== CJK Accuracy ===")
         print(f"Accuracy: {accuracy:.1f}% ({correct}/{len(cjk_tests)})")
 
         # CJK should be highly accurate due to distinct scripts
@@ -315,7 +307,7 @@ class TestContextAwareBenchmarks:
         total_correct = 0
         total_messages = 0
 
-        print(f"\n=== Context-Aware Detection ===")
+        print("\n=== Context-Aware Detection ===")
 
         for conv in CONTEXT_TESTS:
             context = ConversationContext()
@@ -362,7 +354,7 @@ class TestContextAwareBenchmarks:
                 correct += 1
 
         accuracy = correct / len(languages) * 100
-        print(f"\n=== Ambiguous Word ('ok') with Context ===")
+        print("\n=== Ambiguous Word ('ok') with Context ===")
         print(f"Accuracy: {accuracy:.0f}% ({correct}/{len(languages)})")
 
 
@@ -388,7 +380,7 @@ class TestCodeSwitchingBenchmarks:
                 correct += 1
 
         accuracy = correct / total * 100
-        print(f"\n=== Code-Switching Detection ===")
+        print("\n=== Code-Switching Detection ===")
         print(f"Detection rate: {accuracy:.1f}% ({correct}/{total})")
 
         # Should detect most code-switching
@@ -426,7 +418,7 @@ class TestPerformanceBenchmarks:
         p50 = sorted(times)[50]
         p99 = sorted(times)[99]
 
-        print(f"\n=== Single Detection Latency ===")
+        print("\n=== Single Detection Latency ===")
         print(f"Avg: {avg_time:.2f}ms")
         print(f"P50: {p50:.2f}ms")
         print(f"P99: {p99:.2f}ms")
@@ -451,7 +443,7 @@ class TestPerformanceBenchmarks:
         total_texts = len(texts) * iterations
         throughput = total_texts / elapsed
 
-        print(f"\n=== Batch Throughput ===")
+        print("\n=== Batch Throughput ===")
         print(f"Texts processed: {total_texts}")
         print(f"Time: {elapsed:.2f}s")
         print(f"Throughput: {throughput:.0f} texts/sec")
@@ -471,7 +463,7 @@ class TestPerformanceBenchmarks:
             times.append(elapsed)
 
         avg_time = sum(times) / len(times)
-        print(f"\n=== Short Text Latency ===")
+        print("\n=== Short Text Latency ===")
         print(f"Avg: {avg_time:.2f}ms")
 
         # Short text should be fast
@@ -483,7 +475,7 @@ class TestBackendComparisonBenchmarks:
 
     def test_backend_accuracy_comparison(self):
         """Compare accuracy across available backends."""
-        from fastlangml.backends import get_available_backends, create_backend
+        from fastlangml.backends import create_backend, get_available_backends
 
         backends = get_available_backends()
         if not backends:
@@ -492,7 +484,7 @@ class TestBackendComparisonBenchmarks:
         # Use a subset of tests for speed
         test_subset = STANDARD_TESTS[:20]
 
-        print(f"\n=== Backend Accuracy Comparison ===")
+        print("\n=== Backend Accuracy Comparison ===")
 
         results = {}
         for backend_name in backends:
@@ -588,7 +580,7 @@ class TestEdgeCaseBenchmarks:
             ("서울", "ko"),  # Korean
         ]
 
-        for text, expected in test_cases:
+        for text, _expected in test_cases:
             result = detector.detect(text)
             # Should handle Unicode gracefully
             assert result.lang is not None

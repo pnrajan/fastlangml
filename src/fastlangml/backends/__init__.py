@@ -56,7 +56,9 @@ _BACKEND_RELIABILITY: dict[str, int] = {
     "langdetect": 2,
 }
 
-_BUILTIN_BACKEND_NAMES = frozenset({"fasttext", "fastlangid", "langdetect", "lingua", "pycld3", "langid"})
+_BUILTIN_BACKEND_NAMES = frozenset(
+    {"fasttext", "fastlangid", "langdetect", "lingua", "pycld3", "langid"}
+)
 
 
 def backend(name: str, reliability: int = 3) -> Callable[[T], T]:
@@ -106,9 +108,11 @@ def backend(name: str, reliability: int = 3) -> Callable[[T], T]:
         ...     config=DetectionConfig(backends=["openai", "fasttext"])
         ... )
     """
+
     def decorator(cls: T) -> T:
         register_backend(name, cls, reliability)
         return cls
+
     return decorator
 
 
@@ -137,9 +141,7 @@ def register_backend(
         )
 
     if not isinstance(backend_class, type) or not issubclass(backend_class, Backend):
-        raise TypeError(
-            f"backend_class must extend Backend, got {type(backend_class)}"
-        )
+        raise TypeError(f"backend_class must extend Backend, got {type(backend_class)}")
 
     if not isinstance(reliability, int) or not 1 <= reliability <= 5:
         raise ValueError(f"reliability must be 1-5, got {reliability}")
@@ -180,6 +182,7 @@ def clear_registered_backends() -> None:
 # Backend Factory
 # =============================================================================
 
+
 def _get_backend_class(name: str) -> type[Backend]:
     """Get backend class by name (lazy import to avoid loading unavailable deps)."""
     # Check custom registry first
@@ -189,21 +192,27 @@ def _get_backend_class(name: str) -> type[Backend]:
     # Built-in backends (lazy import)
     if name == "fasttext":
         from fastlangml.backends.fasttext_backend import FastTextBackend
+
         return FastTextBackend
     elif name == "fastlangid":
         from fastlangml.backends.fastlangid_backend import FastLangIDBackend
+
         return FastLangIDBackend
     elif name == "langdetect":
         from fastlangml.backends.langdetect_backend import LangdetectBackend
+
         return LangdetectBackend
     elif name == "lingua":
         from fastlangml.backends.lingua_backend import LinguaBackend
+
         return LinguaBackend
     elif name == "pycld3":
         from fastlangml.backends.pycld3_backend import PyCLD3Backend
+
         return PyCLD3Backend
     elif name == "langid":
         from fastlangml.backends.langid_backend import LangidBackend
+
         return LangidBackend
     else:
         available = sorted(_BUILTIN_BACKEND_NAMES | set(_CUSTOM_BACKEND_REGISTRY.keys()))

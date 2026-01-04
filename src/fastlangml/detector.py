@@ -27,7 +27,7 @@ from fastlangml.backends import (
 from fastlangml.backends import (
     DetectionResult as BackendResult,
 )
-from fastlangml.cache import DetectionCache
+from fastlangml.cache import get_cache
 from fastlangml.context.conversation import ConversationContext
 from fastlangml.ensemble.voting import (
     TieBreaker,
@@ -72,9 +72,7 @@ class DetectionConfig:
     """Custom voting strategy instance. If provided, overrides voting_strategy."""
 
     # Thresholds per mode
-    min_chars: dict[str, int] = field(
-        default_factory=lambda: {"short": 2, "default": 3, "long": 3}
-    )
+    min_chars: dict[str, int] = field(default_factory=lambda: {"short": 2, "default": 3, "long": 3})
     """Minimum character count per mode."""
 
     min_letters: dict[str, int] = field(
@@ -164,12 +162,10 @@ class FastLangDetector:
 
         # Initialize components
         self._backends = self._initialize_backends()
-        self._proper_noun_filter = ProperNounFilter(
-            strategy=self._config.proper_noun_strategy
-        )
+        self._proper_noun_filter = ProperNounFilter(strategy=self._config.proper_noun_strategy)
         self._script_filter = ScriptFilter()
         self._voting = self._create_voting_strategy()
-        self._cache: DetectionCache = DetectionCache(self._config.cache_size)
+        self._cache = get_cache(self._config.cache_size)
 
         # Persistent thread pool for parallel backend calls (lazy init)
         self._executor: ThreadPoolExecutor | None = None
@@ -371,7 +367,8 @@ class FastLangDetector:
         # Apply proper noun filter
         detection_text = processed
         should_filter = (
-            filter_proper_nouns if filter_proper_nouns is not None
+            filter_proper_nouns
+            if filter_proper_nouns is not None
             else self._config.filter_proper_nouns
         )
         if should_filter:
@@ -486,24 +483,21 @@ class FastLangDetector:
             max_score = max(ensemble_scores.values())
             if max_score > 0:
                 ensemble_scores = {
-                    lang: min(score / max_score, 1.0)
-                    for lang, score in ensemble_scores.items()
+                    lang: min(score / max_score, 1.0) for lang, score in ensemble_scores.items()
                 }
 
         # Sort and build candidates
-        sorted_results = sorted(
-            ensemble_scores.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_results = sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)
 
         # Check for disagreement
         if len(sorted_results) >= 2:
             diff = sorted_results[0][1] - sorted_results[1][1]
             threshold = self._config.thresholds.get(effective_mode, 0.5)
             if diff < 0.1 and sorted_results[0][1] < threshold:
+
                 def _get_votes(lang: str) -> dict[str, float]:
                     return {
-                        r.backend_name: r.confidence
-                        for r in backend_results if r.language == lang
+                        r.backend_name: r.confidence for r in backend_results if r.language == lang
                     }
 
                 result = DetectionResult(
@@ -524,12 +518,11 @@ class FastLangDetector:
                     meta={
                         "elapsed_ms": (time.perf_counter() - start_time) * 1000,
                         "backend_results": [
-                            (r.backend_name, r.language, r.confidence)
-                            for r in backend_results
+                            (r.backend_name, r.language, r.confidence) for r in backend_results
                         ],
                     },
                 )
-                self._cache.put(cache_key, result)
+                self._cache[cache_key] = result
                 self._update_context_if_needed(text, result, context, auto_update)
                 return result
 
@@ -570,12 +563,11 @@ class FastLangDetector:
                 meta={
                     "elapsed_ms": (time.perf_counter() - start_time) * 1000,
                     "backend_results": [
-                        (r.backend_name, r.language, r.confidence)
-                        for r in backend_results
+                        (r.backend_name, r.language, r.confidence) for r in backend_results
                     ],
                 },
             )
-            self._cache.put(cache_key, result)
+            self._cache[cache_key] = result
             self._update_context_if_needed(text, result, context, auto_update)
             return result
 
@@ -583,7 +575,8 @@ class FastLangDetector:
         def _votes_for(lang: str) -> dict[str, float]:
             return {
                 r.backend_name: round(r.confidence, 4)
-                for r in backend_results if r.language == lang
+                for r in backend_results
+                if r.language == lang
             }
 
         candidates = [
@@ -605,13 +598,12 @@ class FastLangDetector:
             meta={
                 "elapsed_ms": round((time.perf_counter() - start_time) * 1000, 2),
                 "backend_results": [
-                    (r.backend_name, r.language, round(r.confidence, 4))
-                    for r in backend_results
+                    (r.backend_name, r.language, round(r.confidence, 4)) for r in backend_results
                 ],
             },
         )
 
-        self._cache.put(cache_key, result)
+        self._cache[cache_key] = result
         self._update_context_if_needed(text, result, context, auto_update)
         return result
 
@@ -657,8 +649,7 @@ class FastLangDetector:
             self._executor = ThreadPoolExecutor(max_workers=max(len(self._backends), 4))
 
         futures = {
-            self._executor.submit(detect_single, (i, text)): i
-            for i, text in enumerate(texts)
+            self._executor.submit(detect_single, (i, text)): i for i, text in enumerate(texts)
         }
         for future in as_completed(futures):
             idx, result = future.result()
@@ -691,7 +682,7 @@ class FastLangDetector:
     @property
     def cache_stats(self) -> dict[str, int]:
         """Get cache statistics."""
-        return self._cache.stats
+        return {"size": len(self._cache), "maxsize": self._cache.maxsize}
 
 
 class FastLangDetectorBuilder:
@@ -725,9 +716,7 @@ class FastLangDetectorBuilder:
         self._config.voting_strategy = strategy
         return self
 
-    def with_mode(
-        self, mode: Literal["short", "default", "long"]
-    ) -> FastLangDetectorBuilder:
+    def with_mode(self, mode: Literal["short", "default", "long"]) -> FastLangDetectorBuilder:
         """Set the default detection mode."""
         self._config.mode = mode
         return self

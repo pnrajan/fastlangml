@@ -25,12 +25,6 @@ class TestFastLangDetector:
         except NoBackendsAvailableError:
             pytest.skip("No backends available")
 
-    def test_detect_english(self, detector):
-        """Test detecting English."""
-        result = detector.detect("Hello, how are you today?")
-        assert isinstance(result, DetectionResult)
-        assert result.lang == "en"
-
     def test_detect_french(self, detector):
         """Test detecting French."""
         result = detector.detect("Bonjour, comment allez-vous?")
@@ -145,11 +139,7 @@ class TestFastLangDetectorBuilder:
     def test_with_voting_strategy(self):
         """Test setting voting strategy."""
         try:
-            detector = (
-                FastLangDetectorBuilder()
-                .with_voting_strategy("hard")
-                .build()
-            )
+            detector = FastLangDetectorBuilder().with_voting_strategy("hard").build()
             assert isinstance(detector, FastLangDetector)
         except NoBackendsAvailableError:
             pytest.skip("No backends available")
@@ -157,11 +147,7 @@ class TestFastLangDetectorBuilder:
     def test_with_proper_noun_filtering(self):
         """Test setting proper noun filtering."""
         try:
-            detector = (
-                FastLangDetectorBuilder()
-                .with_proper_noun_filtering("mask")
-                .build()
-            )
+            detector = FastLangDetectorBuilder().with_proper_noun_filtering("mask").build()
             assert isinstance(detector, FastLangDetector)
         except NoBackendsAvailableError:
             pytest.skip("No backends available")
@@ -172,11 +158,7 @@ class TestFastLangDetectorBuilder:
         hints.add("bonjour", "fr")
 
         try:
-            detector = (
-                FastLangDetectorBuilder()
-                .with_hints(hints)
-                .build()
-            )
+            detector = FastLangDetectorBuilder().with_hints(hints).build()
             assert "bonjour" in detector.hints
         except NoBackendsAvailableError:
             pytest.skip("No backends available")

@@ -23,6 +23,7 @@ def get_version() -> str:
     """Get package version."""
     try:
         from importlib.metadata import version
+
         return version("fastlangml")
     except Exception:
         return "0.1.0"
@@ -67,8 +68,7 @@ def detect_command(args: argparse.Namespace) -> int:
             output["reason"] = result.reason
         if args.top_k > 1 and result.candidates:
             output["candidates"] = [
-                {"lang": c.lang, "confidence": round(c.confidence, 4)}
-                for c in result.candidates
+                {"lang": c.lang, "confidence": round(c.confidence, 4)} for c in result.candidates
             ]
         output["text"] = text[:100] + "..." if len(text) > 100 else text
 
@@ -197,8 +197,8 @@ def run_self_benchmark(detector: Any, args: argparse.Namespace) -> int:
         print(f"{text_display:<40} {expected:<8} {got:<8} {elapsed:>10.2f}ms {status}")
 
     print("-" * 80)
-    print(f"Accuracy: {correct}/{len(test_cases)} ({correct/len(test_cases)*100:.1f}%)")
-    print(f"Avg time: {total_time/len(test_cases):.2f}ms")
+    print(f"Accuracy: {correct}/{len(test_cases)} ({correct / len(test_cases) * 100:.1f}%)")
+    print(f"Avg time: {total_time / len(test_cases):.2f}ms")
     print(f"Total time: {total_time:.2f}ms")
 
     return 0 if correct == len(test_cases) else 1
@@ -208,72 +208,318 @@ def run_self_benchmark(detector: Any, args: argparse.Namespace) -> int:
 # Also includes variant/dialect mappings
 ISO3_TO_ISO1 = {
     # Major languages
-    "eng": "en", "fra": "fr", "deu": "de", "spa": "es", "ita": "it",
-    "por": "pt", "rus": "ru", "jpn": "ja", "zho": "zh", "kor": "ko",
-    "ara": "ar", "heb": "he", "ell": "el", "tur": "tr", "vie": "vi",
-    "nld": "nl", "pol": "pl", "ukr": "uk", "ces": "cs", "ron": "ro",
-    "hun": "hu", "fin": "fi", "swe": "sv", "dan": "da", "nor": "no",
-    "hin": "hi", "ben": "bn", "tam": "ta", "tel": "te", "mar": "mr",
-    "urd": "ur", "fas": "fa", "tha": "th", "ind": "id", "msa": "ms",
-    "cat": "ca", "eus": "eu", "glg": "gl", "bul": "bg", "hrv": "hr",
-    "srp": "sr", "slk": "sk", "slv": "sl", "lit": "lt", "lav": "lv",
-    "est": "et", "afr": "af", "swa": "sw", "amh": "am", "hau": "ha",
-    "yor": "yo", "ibo": "ig", "mlt": "mt", "isl": "is", "cym": "cy",
-    "gle": "ga", "gla": "gd", "bre": "br", "ltz": "lb", "bos": "bs",
-    "mkd": "mk", "bel": "be", "kat": "ka", "hye": "hy", "aze": "az",
-    "uzb": "uz", "kaz": "kk", "tgk": "tg", "mon": "mn", "mya": "my",
-    "khm": "km", "lao": "lo", "sin": "si", "nep": "ne", "pus": "ps",
-    "kur": "ku", "tuk": "tk", "tat": "tt", "uig": "ug", "yid": "yi",
+    "eng": "en",
+    "fra": "fr",
+    "deu": "de",
+    "spa": "es",
+    "ita": "it",
+    "por": "pt",
+    "rus": "ru",
+    "jpn": "ja",
+    "zho": "zh",
+    "kor": "ko",
+    "ara": "ar",
+    "heb": "he",
+    "ell": "el",
+    "tur": "tr",
+    "vie": "vi",
+    "nld": "nl",
+    "pol": "pl",
+    "ukr": "uk",
+    "ces": "cs",
+    "ron": "ro",
+    "hun": "hu",
+    "fin": "fi",
+    "swe": "sv",
+    "dan": "da",
+    "nor": "no",
+    "hin": "hi",
+    "ben": "bn",
+    "tam": "ta",
+    "tel": "te",
+    "mar": "mr",
+    "urd": "ur",
+    "fas": "fa",
+    "tha": "th",
+    "ind": "id",
+    "msa": "ms",
+    "cat": "ca",
+    "eus": "eu",
+    "glg": "gl",
+    "bul": "bg",
+    "hrv": "hr",
+    "srp": "sr",
+    "slk": "sk",
+    "slv": "sl",
+    "lit": "lt",
+    "lav": "lv",
+    "est": "et",
+    "afr": "af",
+    "swa": "sw",
+    "amh": "am",
+    "hau": "ha",
+    "yor": "yo",
+    "ibo": "ig",
+    "mlt": "mt",
+    "isl": "is",
+    "cym": "cy",
+    "gle": "ga",
+    "gla": "gd",
+    "bre": "br",
+    "ltz": "lb",
+    "bos": "bs",
+    "mkd": "mk",
+    "bel": "be",
+    "kat": "ka",
+    "hye": "hy",
+    "aze": "az",
+    "uzb": "uz",
+    "kaz": "kk",
+    "tgk": "tg",
+    "mon": "mn",
+    "mya": "my",
+    "khm": "km",
+    "lao": "lo",
+    "sin": "si",
+    "nep": "ne",
+    "pus": "ps",
+    "kur": "ku",
+    "tuk": "tk",
+    "tat": "tt",
+    "uig": "ug",
+    "yid": "yi",
     # Additional languages in WiLI-2018
-    "wol": "wo", "rue": "uk", "pnb": "pa", "ori": "or", "mal": "ml",
-    "kan": "kn", "guj": "gu", "pan": "pa", "asm": "as", "san": "sa",
-    "bod": "bo", "div": "dv", "tir": "ti", "som": "so", "kin": "rw",
-    "nya": "ny", "sna": "sn", "zul": "zu", "xho": "xh", "tsn": "tn",
-    "ssw": "ss", "nso": "nso", "sot": "st", "nde": "nd", "lug": "lg",
-    "lin": "ln", "kon": "kg", "orm": "om", "kik": "ki", "run": "rn",
-    "fao": "fo", "hat": "ht", "cos": "co", "oci": "oc", "ast": "ast",
-    "arg": "an", "lim": "li", "fry": "fy", "srd": "sc", "roh": "rm",
-    "fur": "fur", "lad": "lad", "scn": "scn", "nap": "nap", "vec": "vec",
-    "pms": "pms", "eml": "eml", "lmo": "lmo", "war": "war", "ceb": "ceb",
-    "ilo": "ilo", "pag": "pag", "bcl": "bcl", "hil": "hil", "tgl": "tl",
-    "jav": "jv", "sun": "su", "min": "min", "ace": "ace", "ban": "ban",
-    "bjn": "bjn", "bug": "bug", "gor": "gor", "mak": "mak", "sas": "sas",
-    "nds": "nds", "gsw": "gsw", "als": "als", "bar": "bar", "ksh": "ksh",
-    "pfl": "pfl", "sgs": "sgs", "szl": "szl", "hsb": "hsb", "dsb": "dsb",
-    "wln": "wa", "frr": "frr", "stq": "stq", "ang": "ang", "enm": "enm",
-    "frm": "frm", "fro": "fro", "non": "non", "gmh": "gmh", "goh": "goh",
-    "osx": "osx", "nrf": "nrf", "pcd": "pcd", "frp": "frp", "rup": "rup",
-    "dlm": "dlm", "ext": "ext", "mwl": "mwl", "lld": "lld", "rgn": "rgn",
-    "cbk": "cbk", "pap": "pap", "gcf": "gcf", "glv": "gv", "cor": "kw",
-    "sco": "sco", "wym": "wym", "zlm": "ms", "zsm": "ms", "cmn": "zh",
-    "yue": "zh", "wuu": "zh", "nan": "zh", "hak": "zh", "cdo": "zh",
-    "gan": "zh", "hsn": "zh", "mnp": "zh", "cpx": "zh", "czh": "zh",
-    "cjy": "zh", "csp": "zh", "och": "zh", "ltc": "zh", "lzh": "zh",
-    "arz": "ar", "acm": "ar", "apc": "ar", "ary": "ar", "arb": "ar",
-    "apd": "ar", "aao": "ar", "ajp": "ar", "aeb": "ar", "acw": "ar",
-    "acx": "ar", "ayl": "ar", "ars": "ar", "prs": "fa", "pes": "fa",
-    "ckb": "ku", "kmr": "ku", "sdh": "ku", "glk": "fa", "mzn": "mzn",
-    "azb": "az", "crh": "crh", "tyv": "tyv", "sah": "sah",
-    "xal": "xal", "kjh": "kjh", "cjs": "cjs", "krc": "krc", "kum": "kum",
-    "nog": "nog", "gag": "gag", "chv": "cv", "bak": "ba", "udm": "udm",
-    "koi": "koi", "kpv": "kv", "mhr": "mhr", "mrj": "mrj", "mdf": "mdf",
-    "myv": "myv", "vep": "vep", "vro": "vro", "sme": "se", "smn": "smn",
-    "sms": "sms", "smj": "smj", "sma": "sma", "liv": "liv", "krl": "krl",
-    "olo": "olo", "izh": "izh", "vot": "vot", "sel": "sel", "yrk": "yrk",
-    "nio": "nio", "kca": "kca", "mns": "mns", "ket": "ket", "ess": "ess",
-    "esu": "esu", "ems": "ems", "evn": "evn", "eve": "eve", "neg": "neg",
-    "oaa": "oaa", "ulc": "ulc", "ckt": "ckt", "itl": "itl", "ale": "ale",
-    "chp": "chp", "dgr": "dgr", "gwi": "gwi", "hup": "hup", "nv": "nv",
-    "nav": "nv", "mus": "mus", "cho": "cho", "chr": "chr", "moh": "moh",
-    "oj": "oj", "oji": "oj", "cr": "cr", "cre": "cr", "iu": "iu", "iku": "iu",
+    "wol": "wo",
+    "rue": "uk",
+    "pnb": "pa",
+    "ori": "or",
+    "mal": "ml",
+    "kan": "kn",
+    "guj": "gu",
+    "pan": "pa",
+    "asm": "as",
+    "san": "sa",
+    "bod": "bo",
+    "div": "dv",
+    "tir": "ti",
+    "som": "so",
+    "kin": "rw",
+    "nya": "ny",
+    "sna": "sn",
+    "zul": "zu",
+    "xho": "xh",
+    "tsn": "tn",
+    "ssw": "ss",
+    "nso": "nso",
+    "sot": "st",
+    "nde": "nd",
+    "lug": "lg",
+    "lin": "ln",
+    "kon": "kg",
+    "orm": "om",
+    "kik": "ki",
+    "run": "rn",
+    "fao": "fo",
+    "hat": "ht",
+    "cos": "co",
+    "oci": "oc",
+    "ast": "ast",
+    "arg": "an",
+    "lim": "li",
+    "fry": "fy",
+    "srd": "sc",
+    "roh": "rm",
+    "fur": "fur",
+    "lad": "lad",
+    "scn": "scn",
+    "nap": "nap",
+    "vec": "vec",
+    "pms": "pms",
+    "eml": "eml",
+    "lmo": "lmo",
+    "war": "war",
+    "ceb": "ceb",
+    "ilo": "ilo",
+    "pag": "pag",
+    "bcl": "bcl",
+    "hil": "hil",
+    "tgl": "tl",
+    "jav": "jv",
+    "sun": "su",
+    "min": "min",
+    "ace": "ace",
+    "ban": "ban",
+    "bjn": "bjn",
+    "bug": "bug",
+    "gor": "gor",
+    "mak": "mak",
+    "sas": "sas",
+    "nds": "nds",
+    "gsw": "gsw",
+    "als": "als",
+    "bar": "bar",
+    "ksh": "ksh",
+    "pfl": "pfl",
+    "sgs": "sgs",
+    "szl": "szl",
+    "hsb": "hsb",
+    "dsb": "dsb",
+    "wln": "wa",
+    "frr": "frr",
+    "stq": "stq",
+    "ang": "ang",
+    "enm": "enm",
+    "frm": "frm",
+    "fro": "fro",
+    "non": "non",
+    "gmh": "gmh",
+    "goh": "goh",
+    "osx": "osx",
+    "nrf": "nrf",
+    "pcd": "pcd",
+    "frp": "frp",
+    "rup": "rup",
+    "dlm": "dlm",
+    "ext": "ext",
+    "mwl": "mwl",
+    "lld": "lld",
+    "rgn": "rgn",
+    "cbk": "cbk",
+    "pap": "pap",
+    "gcf": "gcf",
+    "glv": "gv",
+    "cor": "kw",
+    "sco": "sco",
+    "wym": "wym",
+    "zlm": "ms",
+    "zsm": "ms",
+    "cmn": "zh",
+    "yue": "zh",
+    "wuu": "zh",
+    "nan": "zh",
+    "hak": "zh",
+    "cdo": "zh",
+    "gan": "zh",
+    "hsn": "zh",
+    "mnp": "zh",
+    "cpx": "zh",
+    "czh": "zh",
+    "cjy": "zh",
+    "csp": "zh",
+    "och": "zh",
+    "ltc": "zh",
+    "lzh": "zh",
+    "arz": "ar",
+    "acm": "ar",
+    "apc": "ar",
+    "ary": "ar",
+    "arb": "ar",
+    "apd": "ar",
+    "aao": "ar",
+    "ajp": "ar",
+    "aeb": "ar",
+    "acw": "ar",
+    "acx": "ar",
+    "ayl": "ar",
+    "ars": "ar",
+    "prs": "fa",
+    "pes": "fa",
+    "ckb": "ku",
+    "kmr": "ku",
+    "sdh": "ku",
+    "glk": "fa",
+    "mzn": "mzn",
+    "azb": "az",
+    "crh": "crh",
+    "tyv": "tyv",
+    "sah": "sah",
+    "xal": "xal",
+    "kjh": "kjh",
+    "cjs": "cjs",
+    "krc": "krc",
+    "kum": "kum",
+    "nog": "nog",
+    "gag": "gag",
+    "chv": "cv",
+    "bak": "ba",
+    "udm": "udm",
+    "koi": "koi",
+    "kpv": "kv",
+    "mhr": "mhr",
+    "mrj": "mrj",
+    "mdf": "mdf",
+    "myv": "myv",
+    "vep": "vep",
+    "vro": "vro",
+    "sme": "se",
+    "smn": "smn",
+    "sms": "sms",
+    "smj": "smj",
+    "sma": "sma",
+    "liv": "liv",
+    "krl": "krl",
+    "olo": "olo",
+    "izh": "izh",
+    "vot": "vot",
+    "sel": "sel",
+    "yrk": "yrk",
+    "nio": "nio",
+    "kca": "kca",
+    "mns": "mns",
+    "ket": "ket",
+    "ess": "ess",
+    "esu": "esu",
+    "ems": "ems",
+    "evn": "evn",
+    "eve": "eve",
+    "neg": "neg",
+    "oaa": "oaa",
+    "ulc": "ulc",
+    "ckt": "ckt",
+    "itl": "itl",
+    "ale": "ale",
+    "chp": "chp",
+    "dgr": "dgr",
+    "gwi": "gwi",
+    "hup": "hup",
+    "nv": "nv",
+    "nav": "nv",
+    "mus": "mus",
+    "cho": "cho",
+    "chr": "chr",
+    "moh": "moh",
+    "oj": "oj",
+    "oji": "oj",
+    "cr": "cr",
+    "cre": "cr",
+    "iu": "iu",
+    "iku": "iu",
     # Language variants (map to base language)
-    "zh-yue": "zh", "zh-min-nan": "zh", "zh-classical": "zh",
-    "be-tarask": "be", "pt-br": "pt", "en-gb": "en", "en-au": "en",
-    "sr-latn": "sr", "sr-cyrl": "sr", "uz-latn": "uz", "uz-cyrl": "uz",
-    "az-latn": "az", "az-cyrl": "az", "ku-arab": "ku", "ku-latn": "ku",
-    "tg-cyrl": "tg", "tg-latn": "tg", "mn-cyrl": "mn", "mn-mong": "mn",
+    "zh-yue": "zh",
+    "zh-min-nan": "zh",
+    "zh-classical": "zh",
+    "be-tarask": "be",
+    "pt-br": "pt",
+    "en-gb": "en",
+    "en-au": "en",
+    "sr-latn": "sr",
+    "sr-cyrl": "sr",
+    "uz-latn": "uz",
+    "uz-cyrl": "uz",
+    "az-latn": "az",
+    "az-cyrl": "az",
+    "ku-arab": "ku",
+    "ku-latn": "ku",
+    "tg-cyrl": "tg",
+    "tg-latn": "tg",
+    "mn-cyrl": "mn",
+    "mn-mong": "mn",
     # Fallback - some WiLI languages don't have ISO 639-1
-    "xmf": "ka", "lzz": "ka", "bxr": "mn", "khk": "mn", "mvf": "mn",
+    "xmf": "ka",
+    "lzz": "ka",
+    "bxr": "mn",
+    "khk": "mn",
+    "mvf": "mn",
 }
 
 
@@ -294,11 +540,15 @@ def run_wili_benchmark(detector: Any, args: argparse.Namespace) -> int:
             break
 
     if data_dir is None:
-        print(json.dumps({
-            "error": "WiLI-2018 dataset not found",
-            "message": "Download from: https://zenodo.org/records/841984/files/wili-2018.zip",
-            "expected_path": "data/x_test.txt"
-        }))
+        print(
+            json.dumps(
+                {
+                    "error": "WiLI-2018 dataset not found",
+                    "message": "Download from: https://zenodo.org/records/841984/files/wili-2018.zip",
+                    "expected_path": "data/x_test.txt",
+                }
+            )
+        )
         return 1
 
     print(f"Loading WiLI-2018 dataset from {data_dir}...")
@@ -312,7 +562,7 @@ def run_wili_benchmark(detector: Any, args: argparse.Namespace) -> int:
 
     # Filter by languages if specified
     lang_filter = None
-    if hasattr(args, 'languages') and args.languages:
+    if hasattr(args, "languages") and args.languages:
         lang_filter = set(args.languages.split(","))
         print(f"Filtering to languages: {lang_filter}")
 
@@ -359,7 +609,7 @@ def run_wili_benchmark(detector: Any, args: argparse.Namespace) -> int:
         # Print progress every 100 samples
         if (i + 1) % 100 == 0:
             acc = correct / (i + 1 - unknown_count) * 100 if (i + 1 - unknown_count) > 0 else 0
-            print(f"Processed {i+1}/{n_samples} - Accuracy: {acc:.1f}% ({unknown_count} unknown)")
+            print(f"Processed {i + 1}/{n_samples} - Accuracy: {acc:.1f}% ({unknown_count} unknown)")
 
     print("-" * 80)
     evaluated = n_samples - unknown_count
@@ -370,8 +620,8 @@ def run_wili_benchmark(detector: Any, args: argparse.Namespace) -> int:
     print(f"Evaluated: {evaluated} (excluded {unknown_count} 'und')")
     print(f"Correct: {correct}")
     print(f"Accuracy: {accuracy:.2f}%")
-    print(f"Avg time: {total_time/n_samples:.2f}ms per sample")
-    print(f"Total time: {total_time/1000:.2f}s")
+    print(f"Avg time: {total_time / n_samples:.2f}ms per sample")
+    print(f"Total time: {total_time / 1000:.2f}s")
 
     # Top 10 languages by accuracy
     print("\n--- Per-Language Accuracy (top 10) ---")
@@ -432,20 +682,23 @@ def main(argv: list[str] | None = None) -> int:
         description="Fast, accurate language detection with multiple backends",
     )
     parser.add_argument(
-        "--version", "-V",
+        "--version",
+        "-V",
         action="version",
         version=f"fastlangml {get_version()}",
     )
 
     # Global options
     parser.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["json", "jsonl", "table"],
         default="json",
         help="Output format",
     )
     parser.add_argument(
-        "--pretty", "-p",
+        "--pretty",
+        "-p",
         action="store_true",
         help="Pretty-print JSON output",
     )
@@ -480,9 +733,7 @@ def main(argv: list[str] | None = None) -> int:
     # Bench subcommand
     bench_parser = subparsers.add_parser("bench", help="Run benchmark")
     bench_parser.add_argument("--dataset", "-d", choices=["wili", "self"], default="self")
-    bench_parser.add_argument(
-        "--n-samples", "-n", type=int, default=1000, help="Number of samples"
-    )
+    bench_parser.add_argument("--n-samples", "-n", type=int, default=1000, help="Number of samples")
     bench_parser.add_argument(
         "--languages", "-l", type=str, help="Filter languages (comma-separated)"
     )

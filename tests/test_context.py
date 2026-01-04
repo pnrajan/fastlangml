@@ -1,6 +1,5 @@
 """Tests for conversation context."""
 
-
 from fastlangml.context.conversation import ConversationContext
 
 

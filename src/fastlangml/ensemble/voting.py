@@ -301,9 +301,7 @@ class ConsensusVoting(VotingStrategy):
             return {}
 
         # Count top-1 predictions
-        top_predictions = Counter(
-            r.language for r in results if r.language != "unknown"
-        )
+        top_predictions = Counter(r.language for r in results if r.language != "unknown")
 
         # Filter to languages meeting agreement threshold
         agreed = {
@@ -346,8 +344,7 @@ def create_voting_strategy(
         return ConsensusVoting(min_agreement=min_agreement)
     else:
         raise ValueError(
-            f"Unknown voting strategy: {strategy_name}. "
-            f"Available: hard, soft, weighted, consensus"
+            f"Unknown voting strategy: {strategy_name}. Available: hard, soft, weighted, consensus"
         )
 
 

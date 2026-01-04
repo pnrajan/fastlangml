@@ -1,6 +1,5 @@
 """Tests for ensemble voting strategies."""
 
-
 from fastlangml.backends.base import DetectionResult
 from fastlangml.ensemble.voting import (
     ConsensusVoting,

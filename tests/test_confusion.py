@@ -1,6 +1,5 @@
 """Tests for language confusion resolution."""
 
-
 from fastlangml.ensemble.confusion import (
     CONFUSED_PAIRS,
     ConfusionResolver,
@@ -70,7 +69,7 @@ class TestConfusionResolver:
         assert features is not None
         es_features, pt_features = features
         assert "pero" in es_features  # Spanish "but"
-        assert "mas" in pt_features   # Portuguese "but"
+        assert "mas" in pt_features  # Portuguese "but"
 
     def test_get_discriminating_features_not_pair(self):
         """Test getting features for non-confused pair."""
@@ -168,4 +167,4 @@ class TestConfusedPairs:
         assert "es" in features
         assert "pt" in features
         assert "pero" in features["es"]  # Spanish "but"
-        assert "mas" in features["pt"]   # Portuguese "but"
+        assert "mas" in features["pt"]  # Portuguese "but"
