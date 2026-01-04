@@ -1,0 +1,48 @@
+{
+  "en": [
+    "hello", "hi", "hey", "bye", "goodbye", "thanks", "thanx", "thx", "ty", "sorry", "sry", "please", "pls", "plz",
+    "yes", "yeah", "yep", "yup", "nope", "nah", "meh", "kk", "np", "yw",
+    "lol", "lmao", "rofl", "omg", "omfg", "wtf", "wow", "haha", "hehe", "bruh", "bro", "dude",
+    "what", "wut", "why", "how", "really", "rly", "seriously", "srsly", "actually", "tbh",
+    "oops", "ugh", "yay", "damn", "duh", "whoa", "idk", "idc", "btw", "fyi", "afaik", "imo", "imho",
+    "awesome", "amazing", "great", "nice", "cool", "ok", "okay", "sure", "right", "alright"
+  ],
+  "es": [
+    "hola", "adios", "gracias", "perdon", "disculpa", "vale", "claro", "venga", "vamos",
+    "bueno", "buena", "malo", "mala", "genial", "guay", "mola",
+    "jaja", "jeje", "jiji", "tio", "tia", "hostia", "coño", "joder",
+    "oye", "anda", "vaya", "uff", "bah", "ole", "pues", "hombre", "mujer"
+  ],
+  "fr": [
+    "bonjour", "bonsoir", "salut", "coucou", "aurevoir", "merci", "pardon", "svp",
+    "oui", "ouais", "mouais", "bof", "voila", "alors", "enfin", "donc",
+    "mdr", "ptdr", "quoi", "pourquoi", "comment",
+    "sympa", "nickel", "chouette", "mince", "zut", "putain", "merde"
+  ],
+  "de": [
+    "hallo", "guten", "morgen", "abend", "tschuss", "danke", "bitte", "entschuldigung",
+    "nein", "gut", "schlecht", "toll", "geil", "krass",
+    "was", "wie", "warum", "wer", "ach", "mensch", "mann",
+    "alles", "klar", "stimmt", "doch", "schon", "genau", "echt"
+  ],
+  "it": [
+    "ciao", "buongiorno", "buonasera", "grazie", "prego", "scusa", "scusi",
+    "bene", "male", "bravo", "brava", "bello", "bella",
+    "dai", "ecco", "allora", "insomma", "boh", "mah",
+    "cosa", "perche", "certo", "magari", "figurati",
+    "fantastico", "perfetto", "cavolo", "cazzo", "madonna"
+  ],
+  "nl": [
+    "hallo", "hoi", "dag", "doei", "bedankt", "dank", "alstublieft",
+    "nee", "goed", "slecht", "leuk", "mooi", "gaaf", "vet", "tof", "lekker",
+    "wat", "hoe", "waarom", "wie", "waar",
+    "zeker", "nou", "zeg", "hoor", "joh", "goh", "pfff", "oei", "poeh", "jammer"
+  ],
+  "pt": [
+    "ola", "oi", "tchau", "adeus", "obrigado", "obrigada", "desculpa", "desculpe",
+    "sim", "nao", "bem", "legal", "massa", "demais",
+    "nossa", "caramba", "putz", "opa", "eita",
+    "tipo", "entao", "pois", "porque",
+    "beleza", "valeu", "blz", "kkk", "rsrs", "kkkk"
+  ]
+}

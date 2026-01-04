@@ -1,0 +1,110 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fastlangid"
+version = "0.1.0"
+description = "Fast, accurate language detection with multiple backends, proper noun filtering, and context awareness"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "PRajan" }
+]
+keywords = [
+    "language-detection",
+    "nlp",
+    "fasttext",
+    "lingua",
+    "langdetect",
+    "langid",
+    "cld3",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Linguistic",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "tomli>=2.0.0; python_version < '3.11'",
+    "cachetools>=5.0.0",
+]
+
+[project.optional-dependencies]
+fasttext = ["fasttext-langdetect>=1.0.5", "numpy<2"]
+langdetect = ["langdetect>=1.0.9"]
+lingua = ["lingua-language-detector>=2.0.0"]
+pycld3 = ["pycld3>=0.22"]
+langid = ["langid>=1.1.6"]
+nltk = ["nltk>=3.8"]
+fuzzy = ["rapidfuzz>=3.0.0"]
+all = [
+    "fasttext-langdetect>=1.0.5",
+    "numpy<2",
+    "langdetect>=1.0.9",
+    "lingua-language-detector>=2.0.0",
+    "pycld3>=0.22",
+    "langid>=1.1.6",
+    "rapidfuzz>=3.0.0",
+]
+toml = ["tomli-w>=1.0.0"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "mypy>=1.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+fastlangid = "fastlangid.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/pankajrajan/fastlangid"
+Repository = "https://github.com/pankajrajan/fastlangid"
+Issues = "https://github.com/pankajrajan/fastlangid/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fastlangid"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/README.md",
+    "/LICENSE",
+]
+
+# Include package data files
+[tool.hatch.build]
+include = [
+    "src/fastlangid/**/*.json",
+    "src/fastlangid/py.typed",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

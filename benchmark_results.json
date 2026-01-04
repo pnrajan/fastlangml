@@ -1,0 +1,815 @@
+{
+  "dataset": "wili-2018",
+  "samples": 5000,
+  "evaluated": 4998,
+  "correct": 2073,
+  "accuracy": 41.4765906362545,
+  "unknown_count": 2,
+  "avg_time_ms": 14.678547512908699,
+  "per_language": {
+    "mwl": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "nl": {
+      "accuracy": 100.0,
+      "total": 22
+    },
+    "av": {
+      "accuracy": 10.526315789473683,
+      "total": 19
+    },
+    "tc": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "bjn": {
+      "accuracy": 0.0,
+      "total": 29
+    },
+    "mn": {
+      "accuracy": 89.74358974358975,
+      "total": 39
+    },
+    "fa": {
+      "accuracy": 94.64285714285714,
+      "total": 56
+    },
+    "le": {
+      "accuracy": 7.6923076923076925,
+      "total": 26
+    },
+    "bg": {
+      "accuracy": 96.0,
+      "total": 25
+    },
+    "zh": {
+      "accuracy": 60.66666666666667,
+      "total": 150
+    },
+    "sco": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "li": {
+      "accuracy": 0.0,
+      "total": 43
+    },
+    "id": {
+      "accuracy": 47.61904761904761,
+      "total": 42
+    },
+    "ar": {
+      "accuracy": 100.0,
+      "total": 37
+    },
+    "kn": {
+      "accuracy": 95.65217391304348,
+      "total": 23
+    },
+    "ht": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "bar": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "mr": {
+      "accuracy": 44.827586206896555,
+      "total": 29
+    },
+    "ko": {
+      "accuracy": 38.88888888888889,
+      "total": 54
+    },
+    "koi": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "my": {
+      "accuracy": 100.0,
+      "total": 23
+    },
+    "ja": {
+      "accuracy": 38.63636363636363,
+      "total": 44
+    },
+    "rw": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "be": {
+      "accuracy": 95.91836734693877,
+      "total": 49
+    },
+    "eg": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "mzn": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "eu": {
+      "accuracy": 100.0,
+      "total": 17
+    },
+    "ca": {
+      "accuracy": 100.0,
+      "total": 25
+    },
+    "nd": {
+      "accuracy": 0.0,
+      "total": 18
+    },
+    "tn": {
+      "accuracy": 75.0,
+      "total": 24
+    },
+    "si": {
+      "accuracy": 93.33333333333333,
+      "total": 15
+    },
+    "pa": {
+      "accuracy": 29.82456140350877,
+      "total": 57
+    },
+    "fi": {
+      "accuracy": 100.0,
+      "total": 18
+    },
+    "min": {
+      "accuracy": 0.0,
+      "total": 22
+    },
+    "stq": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "ru": {
+      "accuracy": 100.0,
+      "total": 24
+    },
+    "ku": {
+      "accuracy": 5.88235294117647,
+      "total": 34
+    },
+    "cv": {
+      "accuracy": 31.818181818181817,
+      "total": 22
+    },
+    "om": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "el": {
+      "accuracy": 95.0,
+      "total": 20
+    },
+    "no": {
+      "accuracy": 85.18518518518519,
+      "total": 27
+    },
+    "es": {
+      "accuracy": 100.0,
+      "total": 22
+    },
+    "pag": {
+      "accuracy": 0.0,
+      "total": 25
+    },
+    "rup": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "hy": {
+      "accuracy": 100.0,
+      "total": 22
+    },
+    "fr": {
+      "accuracy": 100.0,
+      "total": 21
+    },
+    "cs": {
+      "accuracy": 51.61290322580645,
+      "total": 31
+    },
+    "sa": {
+      "accuracy": 81.81818181818183,
+      "total": 22
+    },
+    "cy": {
+      "accuracy": 100.0,
+      "total": 16
+    },
+    "als": {
+      "accuracy": 0.0,
+      "total": 25
+    },
+    "sn": {
+      "accuracy": 37.5,
+      "total": 40
+    },
+    "nr": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "ki": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "vo": {
+      "accuracy": 33.33333333333333,
+      "total": 24
+    },
+    "en": {
+      "accuracy": 100.0,
+      "total": 18
+    },
+    "ga": {
+      "accuracy": 100.0,
+      "total": 23
+    },
+    "vl": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "yi": {
+      "accuracy": 100.0,
+      "total": 20
+    },
+    "ml": {
+      "accuracy": 44.680851063829785,
+      "total": 47
+    },
+    "as": {
+      "accuracy": 68.75,
+      "total": 16
+    },
+    "sr": {
+      "accuracy": 39.58333333333333,
+      "total": 48
+    },
+    "dsb": {
+      "accuracy": 0.0,
+      "total": 22
+    },
+    "sl": {
+      "accuracy": 94.44444444444444,
+      "total": 18
+    },
+    "yo": {
+      "accuracy": 84.0,
+      "total": 25
+    },
+    "jv": {
+      "accuracy": 7.6923076923076925,
+      "total": 13
+    },
+    "lo": {
+      "accuracy": 91.30434782608695,
+      "total": 23
+    },
+    "vro": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "gu": {
+      "accuracy": 89.47368421052632,
+      "total": 19
+    },
+    "br": {
+      "accuracy": 44.827586206896555,
+      "total": 29
+    },
+    "uz": {
+      "accuracy": 75.0,
+      "total": 24
+    },
+    "uk": {
+      "accuracy": 83.60655737704919,
+      "total": 61
+    },
+    "chr": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "bn": {
+      "accuracy": 100.0,
+      "total": 20
+    },
+    "mrj": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "az": {
+      "accuracy": 56.41025641025641,
+      "total": 39
+    },
+    "frp": {
+      "accuracy": 0.0,
+      "total": 29
+    },
+    "krc": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "ms": {
+      "accuracy": 58.333333333333336,
+      "total": 24
+    },
+    "ksh": {
+      "accuracy": 0.0,
+      "total": 16
+    },
+    "hi": {
+      "accuracy": 54.54545454545454,
+      "total": 33
+    },
+    "km": {
+      "accuracy": 95.0,
+      "total": 20
+    },
+    "gv": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "lg": {
+      "accuracy": 90.9090909090909,
+      "total": 22
+    },
+    "qu": {
+      "accuracy": 29.166666666666668,
+      "total": 24
+    },
+    "ze": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "an": {
+      "accuracy": 5.555555555555555,
+      "total": 18
+    },
+    "ka": {
+      "accuracy": 25.510204081632654,
+      "total": 98
+    },
+    "bo": {
+      "accuracy": 100.0,
+      "total": 20
+    },
+    "it": {
+      "accuracy": 100.0,
+      "total": 27
+    },
+    "wo": {
+      "accuracy": 0.0,
+      "total": 27
+    },
+    "fy": {
+      "accuracy": 54.166666666666664,
+      "total": 24
+    },
+    "ast": {
+      "accuracy": 0.0,
+      "total": 25
+    },
+    "af": {
+      "accuracy": 100.0,
+      "total": 18
+    },
+    "sc": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "sq": {
+      "accuracy": 90.0,
+      "total": 30
+    },
+    "oc": {
+      "accuracy": 5.555555555555555,
+      "total": 18
+    },
+    "gag": {
+      "accuracy": 0.0,
+      "total": 16
+    },
+    "kw": {
+      "accuracy": 3.571428571428571,
+      "total": 28
+    },
+    "sk": {
+      "accuracy": 100.0,
+      "total": 29
+    },
+    "sw": {
+      "accuracy": 100.0,
+      "total": 30
+    },
+    "ln": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "pd": {
+      "accuracy": 0.0,
+      "total": 34
+    },
+    "gr": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "ma": {
+      "accuracy": 2.631578947368421,
+      "total": 38
+    },
+    "ha": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "nc": {
+      "accuracy": 0.0,
+      "total": 15
+    },
+    "war": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "se": {
+      "accuracy": 0.0,
+      "total": 19
+    },
+    "ang": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "co": {
+      "accuracy": 0.0,
+      "total": 12
+    },
+    "bp": {
+      "accuracy": 0.0,
+      "total": 27
+    },
+    "ch": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "scn": {
+      "accuracy": 0.0,
+      "total": 15
+    },
+    "ta": {
+      "accuracy": 100.0,
+      "total": 19
+    },
+    "ur": {
+      "accuracy": 89.28571428571429,
+      "total": 28
+    },
+    "nds": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "di": {
+      "accuracy": 0.0,
+      "total": 26
+    },
+    "te": {
+      "accuracy": 45.23809523809524,
+      "total": 42
+    },
+    "vep": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "hr": {
+      "accuracy": 100.0,
+      "total": 20
+    },
+    "lt": {
+      "accuracy": 51.02040816326531,
+      "total": 49
+    },
+    "ig": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "gd": {
+      "accuracy": 52.94117647058824,
+      "total": 17
+    },
+    "vi": {
+      "accuracy": 100.0,
+      "total": 17
+    },
+    "bh": {
+      "accuracy": 0.0,
+      "total": 18
+    },
+    "pcd": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "lr": {
+      "accuracy": 11.11111111111111,
+      "total": 18
+    },
+    "lv": {
+      "accuracy": 100.0,
+      "total": 33
+    },
+    "os": {
+      "accuracy": 50.0,
+      "total": 24
+    },
+    "mdf": {
+      "accuracy": 0.0,
+      "total": 21
+    },
+    "he": {
+      "accuracy": 100.0,
+      "total": 25
+    },
+    "am": {
+      "accuracy": 95.65217391304348,
+      "total": 23
+    },
+    "tt": {
+      "accuracy": 20.0,
+      "total": 15
+    },
+    "nn": {
+      "accuracy": 92.3076923076923,
+      "total": 26
+    },
+    "ne": {
+      "accuracy": 72.54901960784314,
+      "total": 51
+    },
+    "cbk": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "su": {
+      "accuracy": 13.636363636363635,
+      "total": 22
+    },
+    "or": {
+      "accuracy": 87.5,
+      "total": 16
+    },
+    "tk": {
+      "accuracy": 4.0,
+      "total": 25
+    },
+    "xh": {
+      "accuracy": 83.33333333333334,
+      "total": 24
+    },
+    "dv": {
+      "accuracy": 95.23809523809523,
+      "total": 21
+    },
+    "in": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "hsb": {
+      "accuracy": 0.0,
+      "total": 30
+    },
+    "ug": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "fur": {
+      "accuracy": 0.0,
+      "total": 18
+    },
+    "crh": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "il": {
+      "accuracy": 0.0,
+      "total": 26
+    },
+    "vec": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "lad": {
+      "accuracy": 0.0,
+      "total": 14
+    },
+    "pap": {
+      "accuracy": 0.0,
+      "total": 25
+    },
+    "mt": {
+      "accuracy": 16.666666666666664,
+      "total": 18
+    },
+    "mk": {
+      "accuracy": 96.15384615384616,
+      "total": 26
+    },
+    "pt": {
+      "accuracy": 84.21052631578947,
+      "total": 19
+    },
+    "lb": {
+      "accuracy": 21.428571428571427,
+      "total": 14
+    },
+    "ro": {
+      "accuracy": 57.14285714285714,
+      "total": 42
+    },
+    "ep": {
+      "accuracy": 0.0,
+      "total": 25
+    },
+    "myv": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "ba": {
+      "accuracy": 35.714285714285715,
+      "total": 14
+    },
+    "sv": {
+      "accuracy": 100.0,
+      "total": 24
+    },
+    "nap": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "tl": {
+      "accuracy": 95.65217391304348,
+      "total": 23
+    },
+    "gl": {
+      "accuracy": 0.0,
+      "total": 22
+    },
+    "da": {
+      "accuracy": 100.0,
+      "total": 13
+    },
+    "bcl": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "de": {
+      "accuracy": 100.0,
+      "total": 20
+    },
+    "et": {
+      "accuracy": 100.0,
+      "total": 18
+    },
+    "is": {
+      "accuracy": 100.0,
+      "total": 23
+    },
+    "fo": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "tyv": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "ay": {
+      "accuracy": 0.0,
+      "total": 26
+    },
+    "pl": {
+      "accuracy": 100.0,
+      "total": 21
+    },
+    "dt": {
+      "accuracy": 0.0,
+      "total": 14
+    },
+    "so": {
+      "accuracy": 83.33333333333334,
+      "total": 24
+    },
+    "wa": {
+      "accuracy": 6.25,
+      "total": 16
+    },
+    "sgs": {
+      "accuracy": 0.0,
+      "total": 18
+    },
+    "bs": {
+      "accuracy": 26.08695652173913,
+      "total": 23
+    },
+    "szl": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "pfl": {
+      "accuracy": 0.0,
+      "total": 18
+    },
+    "hb": {
+      "accuracy": 0.0,
+      "total": 14
+    },
+    "ps": {
+      "accuracy": 6.896551724137931,
+      "total": 29
+    },
+    "kk": {
+      "accuracy": 100.0,
+      "total": 20
+    },
+    "jb": {
+      "accuracy": 94.73684210526315,
+      "total": 19
+    },
+    "sah": {
+      "accuracy": 0.0,
+      "total": 14
+    },
+    "ilo": {
+      "accuracy": 0.0,
+      "total": 19
+    },
+    "hu": {
+      "accuracy": 100.0,
+      "total": 22
+    },
+    "nv": {
+      "accuracy": 0.0,
+      "total": 15
+    },
+    "kb": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "th": {
+      "accuracy": 100.0,
+      "total": 21
+    },
+    "ext": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "ace": {
+      "accuracy": 0.0,
+      "total": 24
+    },
+    "tr": {
+      "accuracy": 100.0,
+      "total": 20
+    },
+    "mhr": {
+      "accuracy": 0.0,
+      "total": 12
+    },
+    "tg": {
+      "accuracy": 80.0,
+      "total": 30
+    },
+    "la": {
+      "accuracy": 94.44444444444444,
+      "total": 18
+    },
+    "ceb": {
+      "accuracy": 0.0,
+      "total": 15
+    },
+    "lmo": {
+      "accuracy": 0.0,
+      "total": 20
+    },
+    "olo": {
+      "accuracy": 0.0,
+      "total": 22
+    },
+    "to": {
+      "accuracy": 0.0,
+      "total": 23
+    },
+    "nso": {
+      "accuracy": 0.0,
+      "total": 12
+    },
+    "rm": {
+      "accuracy": 0.0,
+      "total": 17
+    },
+    "udm": {
+      "accuracy": 0.0,
+      "total": 21
+    }
+  }
+}
