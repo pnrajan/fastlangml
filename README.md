@@ -84,10 +84,13 @@ pip install fastlangml[langdetect]
 | Backend | Languages | Speed | Accuracy | Install Extra |
 |---------|-----------|-------|----------|---------------|
 | fasttext | 176 | Fast | High | `[fasttext]` |
+| fastlangid | 177 | Fast | High (CJK) | `[fastlangid]` |
 | lingua | 75 | Medium | Very High | `[lingua]` |
 | langdetect | 55 | Fast | Medium | `[langdetect]` |
 | pycld3 | 107 | Very Fast | Medium | `[pycld3]` |
 | langid | 97 | Fast | Medium | `[langid]` |
+
+> **Note:** `fastlangid` provides improved accuracy for Japanese, Korean, Chinese, and Cantonese detection.
 
 **Optional features:**
 
