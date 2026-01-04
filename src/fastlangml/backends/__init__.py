@@ -50,11 +50,12 @@ _CUSTOM_BACKEND_REGISTRY: dict[str, type[Backend]] = {}
 _BACKEND_RELIABILITY: dict[str, int] = {
     "fasttext": 5,
     "lingua": 4,
+    "langid": 3,
     "pycld3": 3,
     "langdetect": 2,
 }
 
-_BUILTIN_BACKEND_NAMES = frozenset({"fasttext", "langdetect", "lingua", "pycld3"})
+_BUILTIN_BACKEND_NAMES = frozenset({"fasttext", "langdetect", "lingua", "pycld3", "langid"})
 
 
 def backend(name: str, reliability: int = 3) -> Callable[[T], T]:
@@ -197,6 +198,9 @@ def _get_backend_class(name: str) -> type[Backend]:
     elif name == "pycld3":
         from fastlangml.backends.pycld3_backend import PyCLD3Backend
         return PyCLD3Backend
+    elif name == "langid":
+        from fastlangml.backends.langid_backend import LangidBackend
+        return LangidBackend
     else:
         available = sorted(_BUILTIN_BACKEND_NAMES | set(_CUSTOM_BACKEND_REGISTRY.keys()))
         raise ValueError(f"Unknown backend: {name}. Available: {available}")
