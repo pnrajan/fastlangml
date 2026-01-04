@@ -33,20 +33,26 @@ def filter_names(text: str, use_probablepeople: bool = True) -> tuple[str, list[
             # Try to parse as name
             try:
                 parsed, name_type = pp.tag(text)
-                if name_type == 'Person':
+                if name_type == "Person":
                     # Extract name parts
                     name_parts = []
                     for key, value in parsed.items():
-                        if key in ('GivenName', 'Surname', 'MiddleName',
-                                   'FirstInitial', 'LastInitial', 'Nickname'):
+                        if key in (
+                            "GivenName",
+                            "Surname",
+                            "MiddleName",
+                            "FirstInitial",
+                            "LastInitial",
+                            "Nickname",
+                        ):
                             name_parts.append(value)
                             detected_names.append(value)
 
                     # Remove name parts from text
                     for part in name_parts:
-                        pattern = r'\b' + re.escape(part) + r'\b'
-                        filtered = re.sub(pattern, '', filtered, flags=re.IGNORECASE)
-                    filtered = ' '.join(filtered.split())
+                        pattern = r"\b" + re.escape(part) + r"\b"
+                        filtered = re.sub(pattern, "", filtered, flags=re.IGNORECASE)
+                    filtered = " ".join(filtered.split())
 
             except pp.RepeatedLabelError:
                 pass  # Not a parseable name
@@ -76,8 +82,24 @@ def is_likely_name(text: str) -> bool:
     # All words start with capital
     if all(w[0].isupper() for w in words if w):
         # No common function words
-        common_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be',
-                        'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for'}
+        common_words = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "and",
+            "or",
+            "but",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+        }
         if not any(w.lower() in common_words for w in words):
             return True
 

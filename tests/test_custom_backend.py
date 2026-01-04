@@ -96,9 +96,7 @@ class TestBackendDecorator:
             def supported_languages(self) -> set[str]:
                 return {"fr"}
 
-        detector = FastLangDetector(
-            config=DetectionConfig(backends=["french_detector"])
-        )
+        detector = FastLangDetector(config=DetectionConfig(backends=["french_detector"]))
         result = detector.detect("Bonjour")
 
         assert result.lang == "fr"
@@ -281,8 +279,7 @@ class TestCustomBackendInEnsemble:
 
             def detect(self, text: str) -> DetectionResult:
                 return DetectionResult(
-                    "english_voter", "en", 0.9,
-                    all_probabilities={"en": 0.9, "fr": 0.1}
+                    "english_voter", "en", 0.9, all_probabilities={"en": 0.9, "fr": 0.1}
                 )
 
             def supported_languages(self) -> set[str]:
@@ -300,8 +297,7 @@ class TestCustomBackendInEnsemble:
 
             def detect(self, text: str) -> DetectionResult:
                 return DetectionResult(
-                    "french_voter", "fr", 0.95,
-                    all_probabilities={"fr": 0.95, "en": 0.05}
+                    "french_voter", "fr", 0.95, all_probabilities={"fr": 0.95, "en": 0.05}
                 )
 
             def supported_languages(self) -> set[str]:

@@ -174,13 +174,15 @@ class CodeSwitchDetector:
                 conf = result.confidence
 
                 if conf >= self.min_confidence_threshold and lang != "unknown":
-                    spans.append(CodeSwitchSpan(
-                        text=word,
-                        language=lang,
-                        confidence=conf,
-                        start=start,
-                        end=end,
-                    ))
+                    spans.append(
+                        CodeSwitchSpan(
+                            text=word,
+                            language=lang,
+                            confidence=conf,
+                            start=start,
+                            end=end,
+                        )
+                    )
                     lang_counts[lang] = lang_counts.get(lang, 0) + 1
             except Exception:
                 pass
@@ -215,13 +217,15 @@ class CodeSwitchDetector:
                 pos = end
 
                 if conf >= self.min_confidence_threshold and lang != "unknown":
-                    spans.append(CodeSwitchSpan(
-                        text=segment,
-                        language=lang,
-                        confidence=conf,
-                        start=start,
-                        end=end,
-                    ))
+                    spans.append(
+                        CodeSwitchSpan(
+                            text=segment,
+                            language=lang,
+                            confidence=conf,
+                            start=start,
+                            end=end,
+                        )
+                    )
                     lang_counts[lang] = lang_counts.get(lang, 0) + len(segment)
             except Exception:
                 pos = text.find(segment, pos) + len(segment)
@@ -250,9 +254,7 @@ class CodeSwitchDetector:
         distribution = {lang: count / total for lang, count in lang_counts.items()}
 
         # Sort by proportion
-        sorted_langs = sorted(
-            distribution.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_langs = sorted(distribution.items(), key=lambda x: x[1], reverse=True)
 
         primary = sorted_langs[0][0]
         secondary = [lang for lang, _ in sorted_langs[1:] if lang != primary]

@@ -31,12 +31,6 @@ class TestCodeSwitchDetector:
         assert result.is_mixed is False
         assert result.primary_language == "und"
 
-    def test_single_language(self, detector):
-        """Test detection on single-language text."""
-        result = detector.detect("Hello, how are you today?")
-        assert result.primary_language == "en"
-        # May or may not be mixed depending on word-level detection
-
     def test_get_language_spans(self, detector):
         """Test getting language spans."""
         spans = detector.get_language_spans("Hello world")

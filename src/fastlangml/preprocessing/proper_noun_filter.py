@@ -55,21 +55,113 @@ class ProperNounFilter:
         # Common title words to preserve (not proper nouns)
         self._common_words = {
             # English
-            "the", "a", "an", "in", "on", "at", "to", "for", "of", "with",
-            "is", "are", "was", "were", "be", "been", "being", "have", "has",
-            "had", "do", "does", "did", "will", "would", "could", "should",
-            "may", "might", "must", "shall", "can", "need", "dare", "ought",
-            "used", "i", "you", "he", "she", "it", "we", "they", "what",
-            "which", "who", "whom", "this", "that", "these", "those", "am",
-            "and", "or", "but", "if", "then", "else", "when", "where", "why",
-            "how", "all", "each", "every", "both", "few", "more", "most",
-            "other", "some", "such", "no", "nor", "not", "only", "own", "same",
-            "so", "than", "too", "very", "just", "also", "now", "here", "there",
+            "the",
+            "a",
+            "an",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "with",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "need",
+            "dare",
+            "ought",
+            "used",
+            "i",
+            "you",
+            "he",
+            "she",
+            "it",
+            "we",
+            "they",
+            "what",
+            "which",
+            "who",
+            "whom",
+            "this",
+            "that",
+            "these",
+            "those",
+            "am",
+            "and",
+            "or",
+            "but",
+            "if",
+            "then",
+            "else",
+            "when",
+            "where",
+            "why",
+            "how",
+            "all",
+            "each",
+            "every",
+            "both",
+            "few",
+            "more",
+            "most",
+            "other",
+            "some",
+            "such",
+            "no",
+            "nor",
+            "not",
+            "only",
+            "own",
+            "same",
+            "so",
+            "than",
+            "too",
+            "very",
+            "just",
+            "also",
+            "now",
+            "here",
+            "there",
             # Common words in other languages that might appear capitalized
-            "der", "die", "das", "und", "oder",  # German
-            "le", "la", "les", "et", "ou",  # French
-            "el", "los", "las", "y", "o",  # Spanish
-            "il", "lo", "gli", "e",  # Italian
+            "der",
+            "die",
+            "das",
+            "und",
+            "oder",  # German
+            "le",
+            "la",
+            "les",
+            "et",
+            "ou",  # French
+            "el",
+            "los",
+            "las",
+            "y",
+            "o",  # Spanish
+            "il",
+            "lo",
+            "gli",
+            "e",  # Italian
         }
 
         # Pattern for potential proper nouns (capitalized words not at sentence start)
@@ -166,12 +258,7 @@ class ProperNounFilter:
                 # - It's a common word
                 # - It's an acronym/all caps (might be important)
                 # - It contains numbers
-                if (
-                    not is_capitalized
-                    or is_first_word
-                    or is_common
-                    or is_numeric
-                ):
+                if not is_capitalized or is_first_word or is_common or is_numeric:
                     filtered_words.append(word)
                 elif is_all_caps:
                     # Might be an acronym, keep it

@@ -86,7 +86,7 @@ SCRIPT_RANGES: dict[Script, list[tuple[int, int]]] = {
 # Each entry: (start_code, end_code, script)
 _SCRIPT_INDEX: list[tuple[int, int, Script]] = sorted(
     [(start, end, script) for script, ranges in SCRIPT_RANGES.items() for start, end in ranges],
-    key=lambda x: x[0]
+    key=lambda x: x[0],
 )
 _SCRIPT_STARTS: list[int] = [entry[0] for entry in _SCRIPT_INDEX]
 

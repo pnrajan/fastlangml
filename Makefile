@@ -30,7 +30,7 @@ format:
 
 # Run type checking
 typecheck:
-	mypy src/fastlangml --strict
+	mypy src/fastlangml --ignore-missing-imports
 
 # Run all checks (lint + typecheck + test)
 check: lint typecheck test

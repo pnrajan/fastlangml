@@ -212,8 +212,7 @@ class HintDictionary:
 
         # Convert to scores
         return {
-            lang: (count / total_matches) * self.hint_confidence
-            for lang, count in matches.items()
+            lang: (count / total_matches) * self.hint_confidence for lang, count in matches.items()
         }
 
     def merge(self, other: HintDictionary | None) -> HintDictionary:

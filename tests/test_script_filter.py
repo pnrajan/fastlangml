@@ -1,6 +1,5 @@
 """Tests for script-based filtering."""
 
-
 from fastlangml.preprocessing.script_filter import (
     Script,
     ScriptFilter,

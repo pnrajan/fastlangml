@@ -76,7 +76,7 @@ class HintPersistence:
         """
         if not HAS_TOML_WRITE:
             raise ImportError(
-                "tomli_w required for TOML writing. " "Install with: pip install tomli-w"
+                "tomli_w required for TOML writing. Install with: pip install tomli-w"
             )
 
         path = Path(path)
