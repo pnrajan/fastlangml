@@ -1,8 +1,7 @@
 """Tests for proper noun filtering."""
 
-import pytest
 
-from fastlangid.preprocessing.proper_noun_filter import ProperNounFilter
+from fastlangml.preprocessing.proper_noun_filter import ProperNounFilter
 
 
 class TestProperNounFilter:

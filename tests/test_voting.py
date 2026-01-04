@@ -1,14 +1,13 @@
 """Tests for ensemble voting strategies."""
 
-import pytest
 
-from fastlangid.backends.base import DetectionResult
-from fastlangid.ensemble.voting import (
+from fastlangml.backends.base import DetectionResult
+from fastlangml.ensemble.voting import (
+    ConsensusVoting,
     HardVoting,
     SoftVoting,
-    WeightedVoting,
-    ConsensusVoting,
     TieBreaker,
+    WeightedVoting,
 )
 
 

@@ -2,23 +2,22 @@
 
 import pytest
 
-from fastlangid import (
+from fastlangml import (
     Backend,
-    FastLangDetector,
     DetectionConfig,
+    FastLangDetector,
     backend,
+    list_registered_backends,
     register_backend,
     unregister_backend,
-    list_registered_backends,
 )
-from fastlangid.backends import (
+from fastlangml.backends import (
+    _BACKEND_RELIABILITY,
     clear_registered_backends,
     create_backend,
     get_available_backends,
-    _CUSTOM_BACKEND_REGISTRY,
-    _BACKEND_RELIABILITY,
 )
-from fastlangid.backends.base import DetectionResult
+from fastlangml.backends.base import DetectionResult
 
 
 @pytest.fixture(autouse=True)

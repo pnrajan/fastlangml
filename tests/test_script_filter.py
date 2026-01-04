@@ -1,8 +1,7 @@
 """Tests for script-based filtering."""
 
-import pytest
 
-from fastlangid.preprocessing.script_filter import (
+from fastlangml.preprocessing.script_filter import (
     Script,
     ScriptFilter,
     detect_script,

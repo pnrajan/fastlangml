@@ -2,7 +2,7 @@
 
 import pytest
 
-from fastlangid.hints.dictionary import HintDictionary
+from fastlangml.hints.dictionary import HintDictionary
 
 
 class TestHintDictionary:

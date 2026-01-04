@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fastlangid"
+name = "fastlangml"
 version = "0.1.0"
 description = "Fast, accurate language detection with multiple backends, proper noun filtering, and context awareness"
 readme = "README.md"
@@ -64,15 +64,15 @@ dev = [
 ]
 
 [project.scripts]
-fastlangid = "fastlangid.cli.main:main"
+fastlangml = "fastlangml.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/pankajrajan/fastlangid"
-Repository = "https://github.com/pankajrajan/fastlangid"
-Issues = "https://github.com/pankajrajan/fastlangid/issues"
+Homepage = "https://github.com/pnrajan/fastlangml"
+Repository = "https://github.com/pnrajan/fastlangml"
+Issues = "https://github.com/pnrajan/fastlangml/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fastlangid"]
+packages = ["src/fastlangml"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 
@@ -87,8 +87,8 @@ include = [
 # Include package data files
 [tool.hatch.build]
 include = [
-    "src/fastlangid/**/*.json",
-    "src/fastlangid/py.typed",
+    "src/fastlangml/**/*.json",
+    "src/fastlangml/py.typed",
 ]
 
 [tool.ruff]
