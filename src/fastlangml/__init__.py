@@ -55,7 +55,7 @@ from fastlangml.codeswitching import (
     CodeSwitchResult,
     detect_code_switching_pattern,
 )
-from fastlangml.context.conversation import ConversationContext, ConversationTurn
+from fastlangml.context import ConversationContext, ConversationTurn
 from fastlangml.detector import (
     DetectionConfig,
     FastLangDetector,

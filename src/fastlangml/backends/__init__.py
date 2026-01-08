@@ -182,6 +182,51 @@ def clear_registered_backends() -> None:
 # Backend Factory
 # =============================================================================
 
+# Cache for import availability checks (avoids repeated import attempts)
+_IMPORT_AVAILABILITY_CACHE: dict[str, bool] = {}
+
+
+def _check_import_available(name: str) -> bool:
+    """Check if backend dependencies can be imported (without instantiation).
+
+    This is much faster than instantiating the backend, which may load
+    heavy ML models (e.g., Lingua loads 100MB+ on init).
+    """
+    if name in _IMPORT_AVAILABILITY_CACHE:
+        return _IMPORT_AVAILABILITY_CACHE[name]
+
+    available = False
+    try:
+        if name == "fasttext":
+            from ftlangdetect import detect  # noqa: F401
+
+            available = True
+        elif name == "fastlangid":
+            from fastlangid.langid import LID  # noqa: F401
+
+            available = True
+        elif name == "lingua":
+            from lingua import LanguageDetectorBuilder  # noqa: F401
+
+            available = True
+        elif name == "pycld3":
+            import cld3  # noqa: F401
+
+            available = True
+        elif name == "langdetect":
+            from langdetect import detect  # noqa: F401
+
+            available = True
+        elif name == "langid":
+            import langid  # noqa: F401
+
+            available = True
+    except ImportError:
+        available = False
+
+    _IMPORT_AVAILABILITY_CACHE[name] = available
+    return available
+
 
 def _get_backend_class(name: str) -> type[Backend]:
     """Get backend class by name (lazy import to avoid loading unavailable deps)."""
@@ -249,21 +294,36 @@ def create_backend(name: str, **kwargs: object) -> Backend:
     return backend
 
 
-def get_available_backends() -> list[str]:
-    """Return list of available backend names (built-in + custom)."""
+def get_available_backends(*, fast_check: bool = True) -> list[str]:
+    """Return list of available backend names (built-in + custom).
+
+    Args:
+        fast_check: If True (default), only check if imports are available.
+            This is much faster (~1ms vs ~500ms) as it doesn't instantiate
+            backends or load ML models. Set to False for full availability check.
+
+    Returns:
+        List of available backend names, sorted by reliability (highest first).
+    """
     available = []
 
     # Check built-in backends
     for name in _BUILTIN_BACKEND_NAMES:
         try:
-            backend_class = _get_backend_class(name)
-            backend_instance = backend_class()
-            if backend_instance.is_available:
-                available.append(name)
+            if fast_check:
+                # Fast path: just check if import works
+                if _check_import_available(name):
+                    available.append(name)
+            else:
+                # Slow path: instantiate and check is_available
+                backend_class = _get_backend_class(name)
+                backend_instance = backend_class()
+                if backend_instance.is_available:
+                    available.append(name)
         except Exception:
             pass
 
-    # Check custom backends
+    # Check custom backends (always need to instantiate)
     for name, backend_class in _CUSTOM_BACKEND_REGISTRY.items():
         try:
             backend_instance = backend_class()

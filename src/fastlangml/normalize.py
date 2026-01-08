@@ -180,6 +180,30 @@ def normalize_text(text: str, *, strip_noise: bool = True) -> str:
     return text.strip()
 
 
+def is_linguistic_from_stats(
+    stats: TextStats, min_letter_ratio: float = 0.3
+) -> tuple[bool, str | None]:
+    """Check if text has enough linguistic content using pre-computed stats.
+
+    Args:
+        stats: Pre-computed TextStats.
+        min_letter_ratio: Minimum ratio of letters to total chars.
+
+    Returns:
+        Tuple of (is_linguistic, reason_if_not).
+    """
+    if stats.n_chars == 0:
+        return False, "empty_text"
+
+    if stats.n_letters == 0:
+        return False, "non_linguistic"
+
+    if stats.letter_ratio < min_letter_ratio:
+        return False, "non_linguistic"
+
+    return True, None
+
+
 def is_linguistic(text: str, min_letter_ratio: float = 0.3) -> tuple[bool, str | None]:
     """Check if text has enough linguistic content for detection.
 
@@ -191,15 +215,27 @@ def is_linguistic(text: str, min_letter_ratio: float = 0.3) -> tuple[bool, str |
         Tuple of (is_linguistic, reason_if_not).
     """
     stats = compute_text_stats(text)
+    return is_linguistic_from_stats(stats, min_letter_ratio)
 
-    if stats.n_chars == 0:
-        return False, "empty_text"
 
-    if stats.n_letters == 0:
-        return False, "non_linguistic"
+def is_sufficient_length_from_stats(
+    stats: TextStats, min_chars: int = 3, min_letters: int = 2
+) -> tuple[bool, str | None]:
+    """Check if text has sufficient length using pre-computed stats.
 
-    if stats.letter_ratio < min_letter_ratio:
-        return False, "non_linguistic"
+    Args:
+        stats: Pre-computed TextStats.
+        min_chars: Minimum total characters required.
+        min_letters: Minimum letters required.
+
+    Returns:
+        Tuple of (is_sufficient, reason_if_not).
+    """
+    if stats.n_chars < min_chars:
+        return False, "too_little_text"
+
+    if stats.n_letters < min_letters:
+        return False, "too_little_text"
 
     return True, None
 
@@ -218,14 +254,7 @@ def is_sufficient_length(
         Tuple of (is_sufficient, reason_if_not).
     """
     stats = compute_text_stats(text)
-
-    if stats.n_chars < min_chars:
-        return False, "too_little_text"
-
-    if stats.n_letters < min_letters:
-        return False, "too_little_text"
-
-    return True, None
+    return is_sufficient_length_from_stats(stats, min_chars, min_letters)
 
 
 # Language tag normalization

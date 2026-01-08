@@ -10,6 +10,7 @@ import time
 from collections import deque
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -20,6 +21,25 @@ class ConversationTurn:
     detected_language: str | None = None
     confidence: float = 0.0
     timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "text": self.text,
+            "detected_language": self.detected_language,
+            "confidence": self.confidence,
+            "timestamp": self.timestamp,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ConversationTurn:
+        """Create from dictionary."""
+        return cls(
+            text=data["text"],
+            detected_language=data.get("detected_language"),
+            confidence=data.get("confidence", 0.0),
+            timestamp=data.get("timestamp", time.time()),
+        )
 
 
 @dataclass
@@ -214,3 +234,100 @@ class ConversationContext:
 
     def __bool__(self) -> bool:
         return len(self._turns) > 0
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary with max_turns, decay_factor, and turns list.
+
+        Example:
+            >>> context = ConversationContext()
+            >>> context.add_turn("Hello", "en", 0.9)
+            >>> data = context.to_dict()
+            >>> data["turns"][0]["detected_language"]
+            'en'
+        """
+        return {
+            "max_turns": self.max_turns,
+            "decay_factor": self.decay_factor,
+            "turns": [turn.to_dict() for turn in self._turns],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ConversationContext:
+        """Create from dictionary.
+
+        Args:
+            data: Dictionary with max_turns, decay_factor, and turns.
+
+        Returns:
+            Restored ConversationContext instance.
+
+        Example:
+            >>> data = {"max_turns": 10, "turns": [{"text": "Hi", "detected_language": "en"}]}
+            >>> ctx = ConversationContext.from_dict(data)
+            >>> ctx.dominant_language
+            'en'
+        """
+        ctx = cls(
+            max_turns=data.get("max_turns", 2),
+            decay_factor=data.get("decay_factor", 0.9),
+        )
+        for turn_data in data.get("turns", []):
+            turn = ConversationTurn.from_dict(turn_data)
+            ctx._turns.append(turn)
+        return ctx
+
+    @classmethod
+    def from_history(
+        cls,
+        history: list[tuple[str, float]] | list[dict[str, Any]],
+        max_turns: int = 5,
+        decay_factor: float = 0.9,
+    ) -> ConversationContext:
+        """Create context from lightweight history for stateless detection.
+
+        This is the recommended pattern for high-traffic production systems.
+        The client stores conversation history and passes it with each request,
+        eliminating server-side state and race conditions.
+
+        Args:
+            history: List of (lang, confidence) tuples or dicts with 'lang'/'confidence'.
+                Only language and confidence are needed, not the original text.
+            max_turns: Maximum turns to consider. Default: 5.
+            decay_factor: Recency weight decay. Default: 0.9.
+
+        Returns:
+            ConversationContext ready for detection.
+
+        Example:
+            >>> # Tuple format (compact)
+            >>> ctx = ConversationContext.from_history([("fr", 0.95), ("fr", 0.9)])
+            >>> ctx.dominant_language
+            'fr'
+
+            >>> # Dict format (from JSON request)
+            >>> ctx = ConversationContext.from_history([
+            ...     {"lang": "fr", "confidence": 0.95},
+            ...     {"lang": "fr", "confidence": 0.90},
+            ... ])
+            >>> detect("ok", context=ctx).lang
+            'fr'
+
+        Note:
+            For stateless operation, the client should:
+            1. Store recent detection results (last 3-5)
+            2. Pass them with each request
+            3. Append new result to their history after detection
+        """
+        ctx = cls(max_turns=max_turns, decay_factor=decay_factor)
+        for item in history:
+            if isinstance(item, tuple):
+                lang, conf = item
+            else:
+                lang = item.get("lang") or item.get("detected_language", "")
+                conf = item.get("confidence", 1.0)
+            if lang:
+                ctx.add_turn("", lang, conf)
+        return ctx

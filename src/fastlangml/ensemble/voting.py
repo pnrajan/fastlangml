@@ -229,6 +229,9 @@ class WeightedVoting(VotingStrategy):
     use_reliability_weights: bool = True
     """If True, use built-in reliability rankings when weights not specified."""
 
+    square_reliability: bool = True
+    """If True, square reliability weights to favor high-reliability backends more."""
+
     def vote(
         self,
         results: list[DetectionResult],
@@ -247,9 +250,10 @@ class WeightedVoting(VotingStrategy):
                 backend_weights[result.backend_name] = effective_weights[result.backend_name]
             elif self.use_reliability_weights:
                 # Use reliability ranking as default weight
-                backend_weights[result.backend_name] = BACKEND_RELIABILITY.get(
-                    result.backend_name, 1.0
-                )
+                rel = BACKEND_RELIABILITY.get(result.backend_name, 1.0)
+                # Square reliability to favor high-reliability backends more
+                # This prevents overconfident low-reliability backends from dominating
+                backend_weights[result.backend_name] = rel * rel if self.square_reliability else rel
             else:
                 backend_weights[result.backend_name] = 1.0
 
@@ -259,20 +263,21 @@ class WeightedVoting(VotingStrategy):
             total_weight = 1.0
         normalized_weights = {k: v / total_weight for k, v in backend_weights.items()}
 
-        # Aggregate weighted probabilities
+        # Aggregate weighted votes
+        # Use primary prediction from each backend (more reliable than all_probabilities
+        # since backends have different output formats)
         weighted_probs: dict[str, float] = {}
 
         for result in results:
             weight = normalized_weights[result.backend_name]
+            lang = result.language
 
-            # Apply reliability penalty if result is unreliable
-            if not result.is_reliable:
-                weight *= 0.5
-
-            for lang, prob in result.all_probabilities.items():
-                if lang not in weighted_probs:
-                    weighted_probs[lang] = 0.0
-                weighted_probs[lang] += prob * weight
+            if lang and lang != "unknown":
+                # Weight = reliability² × confidence
+                # This ensures high-reliability backends with reasonable confidence
+                # beat low-reliability backends with overconfident wrong answers
+                contribution = weight * result.confidence
+                weighted_probs[lang] = weighted_probs.get(lang, 0.0) + contribution
 
         return weighted_probs
 

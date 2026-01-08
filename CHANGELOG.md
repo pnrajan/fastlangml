@@ -5,6 +5,59 @@ All notable changes to FastLangML will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-01-08
+
+### Added
+
+#### Context Persistence
+- **DiskContextStore** - File-based context storage for local development
+  - JSON serialization with TTL support
+  - Auto-cleanup of expired sessions
+  - Context manager API: `with store.session(id) as ctx`
+- **RedisContextStore** - Redis-based storage for production
+  - Native Redis TTL support
+  - Configurable key prefix
+  - Requires `pip install fastlangml[redis]`
+- **Serialization** - `ConversationContext.to_dict()` / `from_dict()` for DIY storage
+
+#### Performance Optimizations
+- **Script short-circuit** - Skip backend calls for unambiguous scripts (~5,500x faster)
+  - Korean (Hangul), Thai, Hebrew, Armenian, Georgian
+  - South Asian: Tamil, Telugu, Kannada, Malayalam, Gujarati, Bengali, Punjabi, Oriya, Sinhala
+  - Southeast Asian: Khmer, Lao, Myanmar, Tibetan
+- **Result caching** - LRU cache with tuple keys (~10,000x faster for repeated text)
+- **Lazy backend loading** - Check imports without instantiating backends
+- **Adaptive parallelism** - Skip threading overhead for ≤2 backends or short text
+- **Unified text stats** - Compute `TextStats` once per detection instead of 3x
+
+### Changed
+
+#### Weighted Voting Improvements
+- **Reliability² weighting** - High-reliability backends now dominate over overconfident low-reliability ones
+  - Formula: `weight = reliability² × confidence`
+  - Prevents langid (reliability=3, conf=1.0) from beating fasttext (reliability=5, conf=0.42)
+- **Reduced tie-break threshold** - From 0.1 to 0.01 to trust voting results more
+- **Removed is_reliable penalty** - Was incorrectly penalizing well-calibrated backends
+
+#### Build System
+- **Migrated to Poetry** - Replaced hatchling with poetry-core
+- Updated dependency management with poetry.lock
+
+### Fixed
+- Short text accuracy improved from 81% to 100% on test suite
+- Norwegian/Danish confusion (still challenging - 96% overall accuracy)
+
+### Benchmarks
+
+| Metric | Value |
+|--------|-------|
+| Standard language accuracy | 96.0% |
+| Short text accuracy | 100.0% |
+| CJK accuracy | 100.0% |
+| Warm detection latency | 8.28ms |
+| Cache hit latency | 0.0006ms |
+| Script short-circuit latency | 0.0006ms |
+
 ## [1.0.0] - 2025-01-03
 
 ### Initial Release
@@ -134,4 +187,5 @@ pip install fastlangml[fasttext,lingua]
 - **Documentation**: https://github.com/pnrajan/FastLangML#readme
 - **Issues**: https://github.com/pnrajan/FastLangML/issues
 
+[1.1.0]: https://github.com/pnrajan/FastLangML/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pnrajan/FastLangML/releases/tag/v1.0.0
