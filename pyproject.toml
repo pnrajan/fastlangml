@@ -1,20 +1,10 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
-[project]
+[tool.poetry]
 name = "fastlangml"
-version = "1.0.0"
+version = "1.1.0"
 description = "FastLangML: High-accuracy language detection for chat, SMS & conversational text. Ensemble of FastText, Lingua, langdetect, CLD3 with context tracking, code-switching detection & 170+ languages."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
-authors = [
-    { name = "PRajan" }
-]
+authors = ["PRajan"]
 keywords = [
     "language-detection",
     "language-identification",
@@ -58,69 +48,75 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
+packages = [{include = "fastlangml", from = "src"}]
 
-dependencies = [
-    "tomli>=2.0.0; python_version < '3.11'",
-    "cachetools>=5.0.0",
-]
-
-[project.optional-dependencies]
-fasttext = ["fasttext-langdetect>=1.0.5", "numpy<2"]
-fastlangid = ["fastlangid>=1.0.11"]
-langdetect = ["langdetect>=1.0.9"]
-lingua = ["lingua-language-detector>=2.0.0"]
-pycld3 = ["pycld3>=0.22"]
-langid = ["langid>=1.1.6"]
-spacy = ["spacy>=3.5.0", "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"]
-fuzzy = ["rapidfuzz>=3.0.0"]
-all = [
-    "fasttext-langdetect>=1.0.5",
-    "fastlangid>=1.0.11",
-    "numpy<2",
-    "langdetect>=1.0.9",
-    "lingua-language-detector>=2.0.0",
-    "pycld3>=0.22",
-    "langid>=1.1.6",
-    "spacy>=3.5.0",
-    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
-    "rapidfuzz>=3.0.0",
-]
-toml = ["tomli-w>=1.0.0"]
-dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    "mypy>=1.0",
-    "ruff>=0.1.0",
-]
-
-[project.scripts]
-fastlangml = "fastlangml.cli.main:main"
-
-[project.urls]
+[tool.poetry.urls]
 Homepage = "https://github.com/pnrajan/FastLangML"
 Repository = "https://github.com/pnrajan/FastLangML"
 Issues = "https://github.com/pnrajan/FastLangML/issues"
 Documentation = "https://github.com/pnrajan/FastLangML#readme"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/fastlangml"]
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+cachetools = ">=5.0.0"
+tomli = {version = ">=2.0.0", python = "<3.11"}
 
-[tool.hatch.build.targets.wheel.shared-data]
+# Optional backend dependencies
+fasttext-langdetect = {version = ">=1.0.5", optional = true}
+numpy = {version = "<2", optional = true}
+fastlangid = {version = ">=1.0.11", optional = true}
+langdetect = {version = ">=1.0.9", optional = true}
+lingua-language-detector = {version = ">=2.0.0", optional = true}
+pycld3 = {version = ">=0.22", optional = true}
+langid = {version = ">=1.1.6", optional = true}
 
-[tool.hatch.build.targets.sdist]
-include = [
-    "/src",
-    "/tests",
-    "/README.md",
-    "/LICENSE",
+# Optional storage dependencies
+diskcache = {version = ">=5.0.0", optional = true}
+redis = {version = ">=4.0.0", optional = true}
+
+# Optional NLP dependencies
+spacy = {version = ">=3.5.0", optional = true}
+rapidfuzz = {version = ">=3.0.0", optional = true}
+
+# Optional TOML writing
+tomli-w = {version = ">=1.0.0", optional = true}
+
+[tool.poetry.extras]
+fasttext = ["fasttext-langdetect", "numpy"]
+fastlangid = ["fastlangid"]
+langdetect = ["langdetect"]
+lingua = ["lingua-language-detector"]
+pycld3 = ["pycld3"]
+langid = ["langid"]
+diskcache = ["diskcache"]
+redis = ["redis"]
+spacy = ["spacy"]
+fuzzy = ["rapidfuzz"]
+toml = ["tomli-w"]
+all = [
+    "fasttext-langdetect",
+    "numpy",
+    "fastlangid",
+    "langdetect",
+    "lingua-language-detector",
+    "pycld3",
+    "langid",
+    "spacy",
+    "rapidfuzz",
 ]
 
-# Include package data files
-[tool.hatch.build]
-include = [
-    "src/fastlangml/**/*.json",
-    "src/fastlangml/py.typed",
-]
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0"
+pytest-cov = ">=4.0"
+mypy = ">=1.0"
+ruff = ">=0.1.0"
+
+[tool.poetry.scripts]
+fastlangml = "fastlangml.cli.main:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 100

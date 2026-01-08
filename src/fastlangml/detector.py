@@ -37,14 +37,38 @@ from fastlangml.ensemble.voting import (
 from fastlangml.hints.dictionary import HintDictionary
 from fastlangml.normalize import (
     compute_text_stats,
-    is_linguistic,
-    is_sufficient_length,
+    is_linguistic_from_stats,
+    is_sufficient_length_from_stats,
     normalize_lang_tag,
     normalize_text,
 )
 from fastlangml.preprocessing.proper_noun_filter import ProperNounFilter
 from fastlangml.preprocessing.script_filter import ScriptFilter
 from fastlangml.result import Candidate, DetectionResult, Reasons
+
+# Scripts that map uniquely to a single language (no backend call needed)
+_UNAMBIGUOUS_SCRIPTS: dict[str, str] = {
+    "Hangul": "ko",  # Korean
+    "Thai": "th",
+    "Hebrew": "he",
+    "Armenian": "hy",
+    "Georgian": "ka",
+    # South Asian scripts
+    "Tamil": "ta",
+    "Telugu": "te",
+    "Kannada": "kn",
+    "Malayalam": "ml",
+    "Gujarati": "gu",
+    "Bengali": "bn",
+    "Punjabi": "pa",
+    "Oriya": "or",
+    "Sinhala": "si",
+    # Southeast Asian scripts
+    "Khmer": "km",
+    "Lao": "lo",
+    "Myanmar": "my",
+    "Tibetan": "bo",
+}
 
 
 @dataclass
@@ -298,8 +322,13 @@ class FastLangDetector:
             effective_langs_set = self._allowed_languages
 
         # Check cache (include allowed_langs for correctness)
-        langs_key = ",".join(sorted(effective_langs_set)) if effective_langs_set else ""
-        cache_key = f"{text}|{effective_mode}|{top_k}|{langs_key}"
+        # P1 Optimization: Use tuple key instead of string concatenation (faster hashing)
+        cache_key = (
+            text,
+            effective_mode,
+            top_k,
+            tuple(sorted(effective_langs_set)) if effective_langs_set else (),
+        )
         cached = self._cache.get(cache_key)
         if cached is not None:
             return cached
@@ -321,10 +350,13 @@ class FastLangDetector:
             )
             return result
 
-        # Check sufficient length
+        # Compute text stats ONCE (optimization: avoid recomputing 3x)
+        stats = compute_text_stats(processed)
+
+        # Check sufficient length (using pre-computed stats)
         min_chars = self._config.min_chars.get(effective_mode, 3)
         min_letters = self._config.min_letters.get(effective_mode, 2)
-        sufficient, reason = is_sufficient_length(processed, min_chars, min_letters)
+        sufficient, reason = is_sufficient_length_from_stats(stats, min_chars, min_letters)
         if not sufficient:
             result = DetectionResult(
                 lang="und",
@@ -336,8 +368,8 @@ class FastLangDetector:
             )
             return result
 
-        # Check linguistic content
-        linguistic, reason = is_linguistic(processed, self._config.min_letter_ratio)
+        # Check linguistic content (using pre-computed stats)
+        linguistic, reason = is_linguistic_from_stats(stats, self._config.min_letter_ratio)
         if not linguistic:
             result = DetectionResult(
                 lang="und",
@@ -375,10 +407,33 @@ class FastLangDetector:
             detection_text = self._proper_noun_filter.filter(processed)
             if not detection_text.strip():
                 detection_text = processed
+            # Recompute stats only if text changed significantly
+            if detection_text != processed:
+                stats = compute_text_stats(detection_text)
 
-        # Detect script
-        stats = compute_text_stats(detection_text)
+        # Use pre-computed script
         detected_script = stats.script
+
+        # P1 Optimization: Short-circuit for unambiguous scripts
+        # Skip backend calls entirely for scripts that map to a single language
+        if detected_script and detected_script in _UNAMBIGUOUS_SCRIPTS:
+            lang = _UNAMBIGUOUS_SCRIPTS[detected_script]
+            # Check if this language is allowed (if restriction is set)
+            if effective_langs_set is None or lang in effective_langs_set:
+                result = DetectionResult(
+                    lang=lang,
+                    confidence=0.99,  # High confidence from script detection
+                    reliable=True,
+                    script=detected_script,
+                    backend="script",
+                    meta={
+                        "elapsed_ms": round((time.perf_counter() - start_time) * 1000, 2),
+                        "short_circuit": True,
+                    },
+                )
+                self._cache[cache_key] = result
+                self._update_context_if_needed(text, result, context, auto_update)
+                return result
 
         # Script-based filtering
         script_languages = None
@@ -400,7 +455,14 @@ class FastLangDetector:
         else:
             backend_name = "none"
 
-        if len(self._backends) > 1:
+        # P2 Optimization: Adaptive parallelism
+        # Skip threading overhead for few backends or short text (threading overhead > benefit)
+        use_parallel = (
+            len(self._backends) > 2  # Need 3+ backends to benefit from parallelism
+            and len(detection_text) > 20  # Short text is fast anyway
+        )
+
+        if use_parallel:
             # Lazy init persistent executor
             if self._executor is None:
                 self._executor = ThreadPoolExecutor(max_workers=len(self._backends))
@@ -417,6 +479,7 @@ class FastLangDetector:
                 if result is not None:
                     backend_results.append(result)
         else:
+            # Sequential execution: faster for 1-2 backends or very short text
             for backend in self._backends:
                 try:
                     result = backend.detect(detection_text)
@@ -658,11 +721,17 @@ class FastLangDetector:
         return [r for r in results if r is not None]
 
     def _needs_tiebreak(self, scores: dict[str, float]) -> bool:
-        """Check if tie-breaking is needed."""
+        """Check if tie-breaking is needed.
+
+        Only trigger tie-break when scores are truly tied (diff < 0.01).
+        The weighted voting already accounts for reliability, so we trust it
+        unless results are nearly identical.
+        """
         if len(scores) < 2:
             return False
         sorted_scores = sorted(scores.values(), reverse=True)
-        return (sorted_scores[0] - sorted_scores[1]) < 0.1
+        # Reduced threshold: trust weighted voting unless truly tied
+        return (sorted_scores[0] - sorted_scores[1]) < 0.01
 
     @property
     def available_backends(self) -> list[str]:

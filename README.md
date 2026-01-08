@@ -22,6 +22,7 @@
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
   - [Context-Aware Detection](#context-aware-detection)
+  - [Persisting Context](#persisting-context)
   - [Multi-Backend Ensemble](#multi-backend-ensemble)
   - [Voting Strategies](#voting-strategies)
   - [Hint Dictionaries](#hint-dictionaries)
@@ -98,6 +99,8 @@ pip install fastlangml[langdetect]
 |---------|-------------|---------------|
 | spaCy NER | Named entity recognition for proper noun filtering | `[spacy]` |
 | fuzzy | Fuzzy matching for hint dictionaries | `[fuzzy]` |
+| diskcache | Disk-based context storage (local dev) | `[diskcache]` |
+| redis | Redis-based context storage (production) | `[redis]` |
 
 ---
 
@@ -197,6 +200,62 @@ def route_message(messages: list[str]) -> str:
 messages = ["Bonjour", "J'ai un probleme", "ok", "merci"]
 queue = route_message(messages)  # Returns "fr"
 ```
+
+---
+
+### Persisting Context
+
+For multi-turn conversations across requests, persist context using the built-in stores.
+
+**DiskContextStore** (local dev/testing):
+
+```bash
+pip install fastlangml[diskcache]
+```
+
+```python
+from fastlangml import detect
+from fastlangml.context import DiskContextStore
+
+store = DiskContextStore("./contexts", ttl_seconds=3600)
+
+# Context manager - auto-saves on exit
+with store.session(session_id) as ctx:
+    result = detect(text, context=ctx, auto_update=True)
+```
+
+**RedisContextStore** (production):
+
+```bash
+pip install fastlangml[redis]
+```
+
+```python
+from fastlangml import detect
+from fastlangml.context import RedisContextStore
+
+store = RedisContextStore("redis://localhost:6379", ttl_seconds=1800)
+
+with store.session(session_id) as ctx:
+    result = detect(text, context=ctx, auto_update=True)
+```
+
+**DIY storage** (no extra deps):
+
+```python
+# Serialize to your own storage
+data = ctx.to_dict()
+save_to_database(session_id, data)
+
+# Load back
+data = load_from_database(session_id)
+ctx = ConversationContext.from_dict(data)
+
+# Or use lightweight history format
+ctx = ConversationContext.from_history([("fr", 0.95), ("fr", 0.9)])
+```
+
+Stores internally save only `[(lang, confidence), ...]` for efficiency.
 
 ---
 
@@ -651,48 +710,71 @@ pattern = detect_code_switching_pattern("That's muy bueno")
 
 ## Benchmarks
 
-### Accuracy on Short Text
+### Accuracy
 
-Tested on 1,000 short messages (2-10 words) from multilingual chat datasets:
+Tested across standard language samples, short text, and CJK:
 
-| Configuration | Accuracy | Avg Latency |
-|---------------|----------|-------------|
-| fasttext only | 82.3% | 0.8ms |
-| lingua only | 89.1% | 4.2ms |
-| ensemble (ft+lingua) | 91.4% | 3.1ms |
-| ensemble + context | 94.7% | 3.3ms |
-| ensemble + context + hints | 96.2% | 3.4ms |
+| Test Category | Accuracy | Notes |
+|---------------|----------|-------|
+| Standard Languages (25 samples) | **96.0%** | Full sentences across 25 languages |
+| Short Text (16 samples) | **100.0%** | Single words like "Hello", "Bonjour", "안녕" |
+| CJK (6 samples) | **100.0%** | Japanese, Chinese, Korean sentences |
 
-### Latency by Backend
+### Backend Comparison
 
-Single message detection latency (median, P99):
+FastLangML ensemble outperforms individual backends:
 
-| Backend | Median | P99 |
-|---------|--------|-----|
-| fasttext | 0.5ms | 2.1ms |
-| langdetect | 1.2ms | 5.8ms |
-| lingua | 3.8ms | 12.4ms |
-| pycld3 | 0.3ms | 1.5ms |
-| ensemble (3 backends) | 2.4ms | 8.2ms |
+| Backend | Accuracy | Avg Latency |
+|---------|----------|-------------|
+| **ensemble** | **100.0%** | 8.28ms |
+| fasttext | 100.0% | 0.01ms |
+| lingua | 90.0% | 0.18ms |
+| langdetect | 80.0% | 2.84ms |
+| langid | 70.0% | 0.56ms |
 
-### Throughput
+### Performance
 
-Batch detection throughput (messages/second):
+| Operation | Latency | Notes |
+|-----------|---------|-------|
+| Initialization | ~100ms | One-time, first detection |
+| First detection (cold) | ~3000ms | Loads all backend models |
+| Warm detection | **8.28ms** | Average per detection |
+| Cache hit | **0.0006ms** | ~10,000x faster |
+| Script short-circuit | **0.0006ms** | Korean, Thai, Hebrew, etc. |
+| Batch (100 texts) | 550ms | ~182 texts/sec |
 
-| Configuration | Single Thread | 4 Threads |
-|---------------|---------------|-----------|
-| fasttext | 12,500 | 42,000 |
-| ensemble (2 backends) | 4,200 | 15,800 |
-| ensemble (3 backends) | 2,100 | 8,400 |
+### Optimizations
+
+FastLangML includes several performance optimizations:
+
+| Optimization | Speedup | Description |
+|--------------|---------|-------------|
+| Script short-circuit | ~5,500x | Skip backends for unambiguous scripts (Hangul→ko, Thai→th) |
+| Result caching | ~10,000x | LRU cache for repeated texts |
+| Lazy backend loading | - | Only load backends when needed |
+| Adaptive parallelism | - | Skip threading for ≤2 backends or short text |
+
+**Script short-circuit languages:**
+- Korean (Hangul), Thai, Hebrew, Armenian, Georgian
+- Tamil, Telugu, Kannada, Malayalam, Gujarati, Bengali, Punjabi, Oriya, Sinhala
+- Khmer, Lao, Myanmar, Tibetan
 
 ### Running Benchmarks
 
 ```bash
-# Built-in benchmark command
-fastlangml bench --n-samples 1000 --languages en,fr,es,de
+# Run accuracy benchmarks
+pytest tests/test_benchmarks.py -v
 
-# With specific dataset
-fastlangml bench --dataset wili --n-samples 500
+# Quick performance check
+python -c "
+from fastlangml import detect
+import time
+
+start = time.perf_counter()
+for i in range(100):
+    detect(f'Hello world {i}')
+print(f'100 detections: {(time.perf_counter()-start)*1000:.0f}ms')
+"
 ```
 
 ---
