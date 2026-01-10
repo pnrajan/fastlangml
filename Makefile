@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format check clean build
+.PHONY: install dev test lint format check clean build commit
 
 # Install package
 install:
@@ -71,6 +71,10 @@ publish: build
 lock:
 	poetry lock
 
+# Interactive commit helper
+commit:
+	./scripts/commit.sh
+
 # Show help
 help:
 	@echo "Available targets:"
@@ -90,3 +94,4 @@ help:
 	@echo "  lock         - Update poetry lock file"
 	@echo "  publish-test - Build and publish to TestPyPI (uses ~/.pypirc)"
 	@echo "  publish      - Build and publish to PyPI (uses ~/.pypirc)"
+	@echo "  commit       - Interactive commit helper (generates message, confirms, pushes)"
