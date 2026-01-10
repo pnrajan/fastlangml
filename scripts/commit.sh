@@ -1,23 +1,15 @@
 #!/bin/bash
 #
-# Smart git commit script
-# Analyzes changes and generates an informed commit message for review
+# Smart commit: analyzes changes vs origin and generates informative commit message
 #
 
 set -e
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-
-echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  Smart Commit Helper${NC}"
-echo -e "${BLUE}========================================${NC}"
-echo
+NC='\033[0m'
 
 # Check if we're in a git repo
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
@@ -25,195 +17,154 @@ if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     exit 1
 fi
 
+BRANCH=$(git branch --show-current)
+ORIGIN="origin/$BRANCH"
+
+# Check if origin branch exists
+if ! git rev-parse --verify "$ORIGIN" > /dev/null 2>&1; then
+    echo -e "${YELLOW}No remote tracking branch. Comparing against HEAD.${NC}"
+    ORIGIN="HEAD"
+fi
+
+# Stage all changes
+git add -A
+
 # Check for changes
-if git diff --quiet && git diff --cached --quiet; then
+if git diff --cached --quiet && git diff "$ORIGIN"..HEAD --quiet 2>/dev/null; then
     echo -e "${YELLOW}No changes to commit${NC}"
     exit 0
 fi
 
-# Stage all changes if nothing is staged
-if git diff --cached --quiet; then
-    echo -e "${YELLOW}No staged changes. Staging all changes...${NC}"
-    git add -A
-fi
-
-# Show current status
-echo -e "${GREEN}=== Files Changed ===${NC}"
-git diff --cached --name-status
+echo -e "${BLUE}═══════════════════════════════════════${NC}"
+echo -e "${BLUE}  Comparing $BRANCH vs $ORIGIN${NC}"
+echo -e "${BLUE}═══════════════════════════════════════${NC}"
 echo
 
-# Get list of changed files
-STAGED_FILES=$(git diff --cached --name-only)
-
-# Show recent commits for context
-echo -e "${GREEN}=== Recent Commits (for style reference) ===${NC}"
-git log --oneline -5
+# Show what's different from origin
+echo -e "${GREEN}Changed files:${NC}"
+git diff --name-status "$ORIGIN" 2>/dev/null || git diff --cached --name-status
 echo
 
-# Analyze the changes to generate commit message
-echo -e "${CYAN}Analyzing changes...${NC}"
-echo
+# Collect all changes for analysis
+CHANGES=$(git diff --name-status "$ORIGIN" 2>/dev/null || git diff --cached --name-status)
+DIFF=$(git diff "$ORIGIN" 2>/dev/null || git diff --cached)
 
-# Get detailed diff for analysis
-DIFF_STAT=$(git diff --cached --stat)
-DIFF_CONTENT=$(git diff --cached --no-color | head -500)
+# Analyze changes to build commit message
+MSG_PARTS=()
 
-# Determine commit type based on files changed
-COMMIT_TYPE="feat"
-if echo "$STAGED_FILES" | grep -qE "^tests?/|_test\.py$|test_.*\.py$"; then
-    COMMIT_TYPE="test"
-elif echo "$STAGED_FILES" | grep -qE "README|CHANGELOG|docs/|\.md$"; then
-    COMMIT_TYPE="docs"
-elif echo "$STAGED_FILES" | grep -qE "pyproject\.toml|Makefile|setup\.|requirements|poetry\.lock"; then
-    COMMIT_TYPE="build"
-elif echo "$STAGED_FILES" | grep -qE "\.github/|ci/|\.yml$"; then
-    COMMIT_TYPE="ci"
-fi
-
-# Build a summary of changes
-SUMMARY_PARTS=()
-
-# Check for new files
-NEW_FILES=$(git diff --cached --name-status | grep "^A" | cut -f2)
-if [ -n "$NEW_FILES" ]; then
-    NEW_COUNT=$(echo "$NEW_FILES" | wc -l | tr -d ' ')
-    if [ "$NEW_COUNT" -eq 1 ]; then
-        SUMMARY_PARTS+=("Add $(basename "$NEW_FILES")")
-    else
-        SUMMARY_PARTS+=("Add $NEW_COUNT new files")
+# Check for specific patterns in the diff
+if echo "$CHANGES" | grep -q "result.py"; then
+    if echo "$DIFF" | grep -q "__str__\|__eq__"; then
+        MSG_PARTS+=("simplified API with __str__/__eq__")
     fi
 fi
 
-# Check for modified files and analyze content
-MODIFIED_FILES=$(git diff --cached --name-status | grep "^M" | cut -f2)
+if echo "$CHANGES" | grep -q "README"; then
+    MSG_PARTS+=("updated README")
+fi
 
-# Analyze specific file changes
-for file in $MODIFIED_FILES; do
-    case "$file" in
-        *result.py)
-            if git diff --cached "$file" | grep -q "__str__\|__eq__"; then
-                SUMMARY_PARTS+=("Add simplified API (__str__, __eq__)")
-            fi
-            ;;
-        *README*)
-            SUMMARY_PARTS+=("Update README")
-            ;;
-        *CHANGELOG*)
-            SUMMARY_PARTS+=("Update CHANGELOG")
-            ;;
-        *pyproject.toml)
-            if git diff --cached "$file" | grep -q "dependencies"; then
-                SUMMARY_PARTS+=("Update dependencies")
-            elif git diff --cached "$file" | grep -q "version"; then
-                SUMMARY_PARTS+=("Bump version")
-            fi
-            ;;
-        *Makefile)
-            SUMMARY_PARTS+=("Update Makefile")
-            ;;
-        *.lock)
-            # Skip lock files in summary, they're implied
-            ;;
-    esac
-done
+if echo "$CHANGES" | grep -q "CHANGELOG"; then
+    MSG_PARTS+=("updated CHANGELOG")
+fi
 
-# Build the commit message
-if [ ${#SUMMARY_PARTS[@]} -eq 0 ]; then
-    # Fallback: use file names
-    FILE_COUNT=$(echo "$STAGED_FILES" | wc -l | tr -d ' ')
-    SHORT_DESC="Update $FILE_COUNT files"
+if echo "$CHANGES" | grep -q "pyproject.toml\|poetry.lock"; then
+    if echo "$DIFF" | grep -q "twine\|build"; then
+        MSG_PARTS+=("added twine/build for publishing")
+    elif echo "$DIFF" | grep -q "diskcache\|redis"; then
+        MSG_PARTS+=("added storage dependencies")
+    elif echo "$DIFF" | grep -q "version"; then
+        MSG_PARTS+=("version bump")
+    else
+        MSG_PARTS+=("updated dependencies")
+    fi
+fi
+
+if echo "$CHANGES" | grep -q "Makefile"; then
+    if echo "$DIFF" | grep -q "commit"; then
+        MSG_PARTS+=("added commit helper")
+    elif echo "$DIFF" | grep -q "twine"; then
+        MSG_PARTS+=("switched to twine for publishing")
+    else
+        MSG_PARTS+=("updated Makefile")
+    fi
+fi
+
+if echo "$CHANGES" | grep -q "scripts/"; then
+    NEW_SCRIPTS=$(echo "$CHANGES" | grep "^A.*scripts/" | cut -f2 | xargs -I{} basename {} 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
+    if [ -n "$NEW_SCRIPTS" ]; then
+        MSG_PARTS+=("added $NEW_SCRIPTS script")
+    fi
+fi
+
+if echo "$CHANGES" | grep -q "store.py\|disk_store\|redis_store"; then
+    MSG_PARTS+=("added context persistence stores")
+fi
+
+if echo "$CHANGES" | grep -qE "^A.*test"; then
+    MSG_PARTS+=("added tests")
+fi
+
+if echo "$CHANGES" | grep -qE "^M.*test"; then
+    MSG_PARTS+=("updated tests")
+fi
+
+# Build the message
+if [ ${#MSG_PARTS[@]} -eq 0 ]; then
+    # Fallback: count files
+    FILE_COUNT=$(echo "$CHANGES" | wc -l | tr -d ' ')
+    COMMIT_MSG="Update $FILE_COUNT files"
 else
-    # Join summary parts
-    SHORT_DESC=$(IFS=", "; echo "${SUMMARY_PARTS[*]}")
+    # Join parts with comma
+    COMMIT_MSG=$(IFS=", "; echo "${MSG_PARTS[*]}")
+    # Capitalize first letter
+    COMMIT_MSG="$(echo "${COMMIT_MSG:0:1}" | tr '[:lower:]' '[:upper:]')${COMMIT_MSG:1}"
 fi
 
-# Truncate if too long
-if [ ${#SHORT_DESC} -gt 72 ]; then
-    SHORT_DESC="${SHORT_DESC:0:69}..."
-fi
-
-# Build detailed body from diff stats
-BODY=""
-if [ -n "$DIFF_STAT" ]; then
-    BODY="Changes:\n"
-    # List each file with its change type
-    while IFS= read -r line; do
-        STATUS=$(echo "$line" | cut -f1)
-        FILE=$(echo "$line" | cut -f2)
-        case $STATUS in
-            A) BODY="$BODY- Add $FILE\n" ;;
-            M) BODY="$BODY- Update $FILE\n" ;;
-            D) BODY="$BODY- Remove $FILE\n" ;;
-            R*) BODY="$BODY- Rename $FILE\n" ;;
-        esac
-    done <<< "$(git diff --cached --name-status)"
-fi
-
-# Build full commit message
-COMMIT_MSG="$COMMIT_TYPE: $SHORT_DESC"
-if [ -n "$BODY" ]; then
-    COMMIT_MSG="$COMMIT_MSG\n\n$BODY"
-fi
-
-# Show the generated commit message
-echo -e "${GREEN}=== Generated Commit Message ===${NC}"
-echo -e "${CYAN}$COMMIT_MSG${NC}"
-echo -e "${GREEN}=================================${NC}"
+# Show generated message
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo -e "${GREEN}Generated commit message:${NC}"
+echo
+echo -e "  ${YELLOW}$COMMIT_MSG${NC}"
+echo
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo
 
-# Ask for confirmation
-echo -e "${YELLOW}What would you like to do?${NC}"
-echo "  1) Approve and commit"
-echo "  2) Approve, commit and push"
-echo "  3) Edit message in editor"
-echo "  4) Cancel"
+# Options
+echo "1) Commit"
+echo "2) Commit and push"
+echo "3) Edit message"
+echo "4) Cancel"
 echo
 read -p "Select [1-4]: " ACTION
 
 case $ACTION in
     1)
-        # Commit only
-        echo -e "$COMMIT_MSG" | git commit -F -
-        echo
-        echo -e "${GREEN}✓ Committed successfully!${NC}"
-        echo
-        git log --oneline -1
+        git commit -m "$COMMIT_MSG"
+        echo -e "${GREEN}✓ Committed${NC}"
         ;;
     2)
-        # Commit and push
-        echo -e "$COMMIT_MSG" | git commit -F -
-
-        BRANCH=$(git branch --show-current)
-        echo
-        echo -e "${BLUE}Pushing to origin/$BRANCH...${NC}"
+        git commit -m "$COMMIT_MSG"
         git push origin "$BRANCH"
-
-        echo
-        echo -e "${GREEN}✓ Committed and pushed successfully!${NC}"
-        echo
-        git log --oneline -1
+        echo -e "${GREEN}✓ Committed and pushed${NC}"
         ;;
     3)
-        # Edit in editor
-        echo -e "$COMMIT_MSG" > /tmp/commit_msg.txt
-        ${EDITOR:-vim} /tmp/commit_msg.txt
-        git commit -F /tmp/commit_msg.txt
-        rm /tmp/commit_msg.txt
-
-        echo
-        echo -e "${GREEN}✓ Committed successfully!${NC}"
-        echo
-        git log --oneline -1
-
-        read -p "Push to remote? [y/N]: " PUSH_CONFIRM
-        if [[ "$PUSH_CONFIRM" =~ ^[Yy]$ ]]; then
-            BRANCH=$(git branch --show-current)
-            git push origin "$BRANCH"
-            echo -e "${GREEN}✓ Pushed successfully!${NC}"
+        read -p "Enter message: " CUSTOM_MSG
+        if [ -n "$CUSTOM_MSG" ]; then
+            git commit -m "$CUSTOM_MSG"
+            echo -e "${GREEN}✓ Committed${NC}"
+            read -p "Push? [y/N]: " PUSH
+            if [[ "$PUSH" =~ ^[Yy]$ ]]; then
+                git push origin "$BRANCH"
+                echo -e "${GREEN}✓ Pushed${NC}"
+            fi
+        else
+            echo -e "${RED}No message provided${NC}"
+            exit 1
         fi
         ;;
-    4|*)
+    *)
         echo -e "${YELLOW}Cancelled${NC}"
+        git reset HEAD > /dev/null 2>&1 || true
         exit 0
         ;;
 esac
