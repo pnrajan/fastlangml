@@ -72,6 +72,18 @@ class DetectionResult:
             return f"DetectionResult(lang='und', reason='{self.reason}')"
         return f"DetectionResult(lang='{self.lang}', confidence={self.confidence:.4f})"
 
+    def __str__(self) -> str:
+        """Return language code for easy string usage."""
+        return self.lang
+
+    def __eq__(self, other: object) -> bool:
+        """Compare with string (language code) or another DetectionResult."""
+        if isinstance(other, str):
+            return self.lang == other
+        if isinstance(other, DetectionResult):
+            return self.lang == other.lang
+        return NotImplemented
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = {

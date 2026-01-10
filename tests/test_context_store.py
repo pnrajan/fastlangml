@@ -60,18 +60,22 @@ class TestConversationContextFromHistory:
         assert ctx.dominant_language == "fr"
 
     def test_from_history_dicts(self) -> None:
-        ctx = ConversationContext.from_history([
-            {"lang": "es", "confidence": 0.9},
-            {"lang": "es", "confidence": 0.85},
-        ])
+        ctx = ConversationContext.from_history(
+            [
+                {"lang": "es", "confidence": 0.9},
+                {"lang": "es", "confidence": 0.85},
+            ]
+        )
         assert len(ctx) == 2
         assert ctx.dominant_language == "es"
 
     def test_from_history_mixed_keys(self) -> None:
         # Supports both "lang" and "detected_language" keys
-        ctx = ConversationContext.from_history([
-            {"detected_language": "de", "confidence": 0.9},
-        ])
+        ctx = ConversationContext.from_history(
+            [
+                {"detected_language": "de", "confidence": 0.9},
+            ]
+        )
         assert ctx.dominant_language == "de"
 
     def test_from_history_empty(self) -> None:
@@ -89,10 +93,12 @@ class TestConversationContextFromHistory:
         assert ctx.decay_factor == 0.8
 
     def test_from_history_skips_empty_lang(self) -> None:
-        ctx = ConversationContext.from_history([
-            {"lang": "", "confidence": 0.9},
-            {"lang": "fr", "confidence": 0.8},
-        ])
+        ctx = ConversationContext.from_history(
+            [
+                {"lang": "", "confidence": 0.9},
+                {"lang": "fr", "confidence": 0.8},
+            ]
+        )
         assert len(ctx) == 1
         assert ctx.dominant_language == "fr"
 

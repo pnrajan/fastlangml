@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Simplified API
+- **`__str__`** - `DetectionResult` can be used as string: `print(detect("Hello"))` → "en"
+- **`__eq__`** - Direct comparison: `detect("Hello") == "en"` → True
+
 #### Context Persistence
 - **DiskContextStore** - File-based context storage for local development
   - JSON serialization with TTL support

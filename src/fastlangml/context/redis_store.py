@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from fastlangml.context.conversation import ConversationContext
 
@@ -48,10 +49,8 @@ class RedisContextStore:
     def save(self, session_id: str, context: ConversationContext) -> None:
         """Save context (stores only lang/confidence)."""
         history = [
-            (t.detected_language, t.confidence)
-            for t in context.turns
-            if t.detected_language
-        ][-self._max_turns:]
+            (t.detected_language, t.confidence) for t in context.turns if t.detected_language
+        ][-self._max_turns :]
         data = json.dumps(history)
         if self._ttl:
             self._client.setex(self._key(session_id), self._ttl, data)

@@ -106,21 +106,65 @@ pip install fastlangml[langdetect]
 
 ## Quick Start
 
-### Basic Detection
+### Single-Shot Detection (Most Common)
+
+The simplest API - just pass text, get language back:
 
 ```python
 from fastlangml import detect
 
-# Simple detection
+# Direct comparison
+detect("Hello") == "en"      # True
+detect("Bonjour") == "fr"    # True
+
+# Use as string
+print(detect("Hola"))        # "es"
+f"Language: {detect('Ciao')}"  # "Language: it"
+
+# Full details when needed
 result = detect("Hello, how are you?")
-print(result.lang)        # "en"
-print(result.confidence)  # 0.95
-print(result.reliable)    # True
+result.lang        # "en"
+result.confidence  # 0.95
+result.reliable    # True
 ```
 
-### Context-Aware Detection
+**That's it!** No context, no stores, no configuration required.
 
-The key feature of FastLangML is **automatic context tracking**. When you pass a `ConversationContext`, the library:
+### Usage Modes
+
+FastLangML supports three usage modes - pick what fits your needs:
+
+| Mode | Code | Use Case |
+|------|------|----------|
+| **Single-shot** | `detect("text") == "en"` | One-off detection (most common) |
+| **With context** | `detect("text", context=ctx)` | Multi-turn chat (in-memory) |
+| **With persistence** | `store.session(id)` | Multi-turn across HTTP requests |
+
+```python
+# 1. Single-shot - no setup needed
+from fastlangml import detect
+detect("Bonjour") == "fr"  # True
+
+# 2. Context - optional, for conversations
+from fastlangml import detect, ConversationContext
+ctx = ConversationContext()
+detect("Bonjour", context=ctx)  # tracks history in memory
+detect("ok", context=ctx) == "fr"  # True (uses context)
+
+# 3. Stores - optional, for persistence across requests
+from fastlangml.context import DiskContextStore
+store = DiskContextStore("./data")
+with store.session("user-123") as ctx:
+    detect("Bonjour", context=ctx)
+```
+
+> **Note:** Context and stores are 100% optional. Most users only need single-shot mode.
+
+---
+
+### Context-Aware Detection (Optional)
+
+For multi-turn conversations, FastLangML can track context to resolve ambiguous short messages. When you pass a `ConversationContext`, the library:
 1. Remembers the last N detected languages
 2. Uses this history to resolve ambiguous messages
 3. Auto-updates the context after each detection
@@ -132,10 +176,10 @@ from fastlangml import detect, ConversationContext
 context = ConversationContext()
 
 # French conversation
-detect("Bonjour!", context=context).lang        # "fr" (clear)
-detect("Comment ca va?", context=context).lang  # "fr" (clear)
-detect("Bien", context=context).lang            # "fr" <- context helps!
-detect("ok", context=context).lang              # "fr" <- continues French
+detect("Bonjour!", context=context)        # "fr" (clear)
+detect("Comment ca va?", context=context)  # "fr" (clear)
+detect("Bien", context=context)            # "fr" <- context helps!
+detect("ok", context=context) == "fr"      # True <- continues French
 
 # The context tracks that this is a French conversation,
 # so ambiguous words resolve to French
@@ -293,7 +337,7 @@ detector = FastLangDetector(
 )
 
 result = detector.detect("Ciao, come stai?")
-print(result.lang)    # "it"
+print(result)         # "it"
 print(result.backend) # "ensemble"
 ```
 
@@ -372,9 +416,9 @@ from fastlangml import FastLangDetector, HintDictionary
 hints = HintDictionary.default_short_words()
 
 detector = FastLangDetector(hints=hints)
-detector.detect("thx").lang   # "en" (thanks)
-detector.detect("mdr").lang   # "fr" (mort de rire = LOL)
-detector.detect("jaja").lang  # "es" (Spanish laugh)
+detector.detect("thx")   # "en" (thanks)
+detector.detect("mdr")   # "fr" (mort de rire = LOL)
+detector.detect("jaja")  # "es" (Spanish laugh)
 ```
 
 **Adding custom hints:**
@@ -390,7 +434,7 @@ detector.add_hint("btw", "en")
 detector.add_hint("stp", "fr")  # s'il te plait
 
 # Hints override backend detection
-detector.detect("asap").lang  # "en"
+detector.detect("asap")  # "en"
 ```
 
 **Hint priority:**
@@ -441,6 +485,11 @@ class DetectionResult:
     backend: str        # Which backend or "ensemble"
     candidates: list    # Top-k alternatives
     meta: dict          # Timing and debug info
+
+# Can be used directly as string
+detect("Hello") == "en"      # True (via __eq__)
+print(detect("Bonjour"))     # "fr" (via __str__)
+f"{detect('Hola')}"          # "es"
 ```
 
 ### ConversationContext
@@ -834,7 +883,7 @@ When FastLangML is uncertain, it returns `und` instead of guessing wrong:
 
 ```python
 result = detect("ok")
-if result.lang == "und":
+if result == "und":  # Can compare directly
     # Fallback to default or ask user
     lang = result.candidates[0].lang if result.candidates else "en"
     print(f"Low confidence: {result.reason}")
@@ -883,14 +932,15 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed gu
 # Clone and setup
 git clone https://github.com/pnrajan/fastlangml.git
 cd fastlangml
-pip install -e ".[dev,all]"
+poetry install --all-extras
 
 # Development commands
-make test       # Run tests
-make lint       # Check code style
-make fix        # Auto-fix linting issues
-make typecheck  # Run type checker
-make check      # Run all checks
+make test         # Run tests
+make lint         # Check code style
+make format       # Format code with ruff
+make fix          # Auto-fix linting issues
+make typecheck    # Run type checker
+make check        # Run all checks (format + lint + typecheck + test)
 ```
 
 ### What We're Looking For

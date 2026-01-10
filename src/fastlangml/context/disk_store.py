@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from fastlangml.context.conversation import ConversationContext
 
@@ -41,10 +42,8 @@ class DiskContextStore:
     def save(self, session_id: str, context: ConversationContext) -> None:
         """Save context (stores only lang/confidence)."""
         history = [
-            (t.detected_language, t.confidence)
-            for t in context.turns
-            if t.detected_language
-        ][-self._max_turns:]
+            (t.detected_language, t.confidence) for t in context.turns if t.detected_language
+        ][-self._max_turns :]
         self._cache.set(session_id, history, expire=self._ttl)
 
     def load(self, session_id: str) -> ConversationContext | None:

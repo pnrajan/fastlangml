@@ -305,9 +305,7 @@ class TestSimulatedConversations:
 
         # Serialize to history (as stores do)
         history = [
-            (t.detected_language, t.confidence)
-            for t in original.turns
-            if t.detected_language
+            (t.detected_language, t.confidence) for t in original.turns if t.detected_language
         ]
 
         # Restore from history

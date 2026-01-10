@@ -2,38 +2,42 @@
 
 # Install package
 install:
-	pip install -e .
+	poetry install
 
-# Install with dev dependencies
+# Install with all dependencies
 dev:
-	pip install -e ".[dev,all]"
+	poetry install --all-extras
 
 # Run tests
 test:
-	python -m pytest tests/ -v --tb=short
+	poetry run pytest tests/ -v --tb=short
 
 # Run tests with coverage
 test-cov:
-	python -m pytest tests/ -v --cov=fastlangml --cov-report=html --cov-report=term
+	poetry run pytest tests/ -v --cov=fastlangml --cov-report=html --cov-report=term
 
 # Run ruff linter
 lint:
-	ruff check src/ tests/
+	poetry run ruff check src/ tests/
 
 # Run ruff with auto-fix
 fix:
-	ruff check --fix src/ tests/
+	poetry run ruff check --fix src/ tests/
 
 # Format code with ruff
 format:
-	ruff format src/ tests/
+	poetry run ruff format src/ tests/
+
+# Check formatting (CI mode - no changes)
+format-check:
+	poetry run ruff format --check src/ tests/
 
 # Run type checking
 typecheck:
-	mypy src/fastlangml --ignore-missing-imports
+	poetry run mypy src/fastlangml --ignore-missing-imports
 
-# Run all checks (lint + typecheck + test)
-check: lint typecheck test
+# Run all checks (format + lint + typecheck + test)
+check: format-check lint typecheck test
 
 # Clean build artifacts
 clean:
@@ -49,34 +53,40 @@ clean:
 
 # Build package
 build: clean
-	python -m build
+	poetry build
 
 # Run benchmarks
 bench:
-	fastlangml bench --n-samples 1000
+	poetry run fastlangml bench --n-samples 1000
 
-# Publish to TestPyPI
-publish-test:
-	./scripts/publish.sh --test
+# Publish to TestPyPI (uses ~/.pypirc)
+publish-test: build
+	twine upload --repository testpypi dist/*
 
-# Publish to PyPI
-publish:
-	./scripts/publish.sh
+# Publish to PyPI (uses ~/.pypirc)
+publish: build
+	twine upload dist/*
+
+# Update poetry lock file
+lock:
+	poetry lock
 
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  install    - Install package"
-	@echo "  dev        - Install with dev dependencies"
-	@echo "  test       - Run tests"
-	@echo "  test-cov   - Run tests with coverage"
-	@echo "  lint       - Run ruff linter"
-	@echo "  fix        - Run ruff with auto-fix"
-	@echo "  format     - Format code with ruff"
-	@echo "  typecheck  - Run mypy type checking"
-	@echo "  check      - Run all checks (lint + typecheck + test)"
-	@echo "  clean      - Clean build artifacts"
-	@echo "  build      - Build package"
-	@echo "  bench      - Run benchmarks"
-	@echo "  publish-test - Publish to TestPyPI"
-	@echo "  publish    - Publish to PyPI"
+	@echo "  install      - Install package with poetry"
+	@echo "  dev          - Install with all dependencies"
+	@echo "  test         - Run tests"
+	@echo "  test-cov     - Run tests with coverage"
+	@echo "  lint         - Run ruff linter"
+	@echo "  fix          - Run ruff with auto-fix"
+	@echo "  format       - Format code with ruff"
+	@echo "  format-check - Check formatting (CI mode)"
+	@echo "  typecheck    - Run mypy type checking"
+	@echo "  check        - Run all checks (format + lint + typecheck + test)"
+	@echo "  clean        - Clean build artifacts"
+	@echo "  build        - Build package"
+	@echo "  bench        - Run benchmarks"
+	@echo "  lock         - Update poetry lock file"
+	@echo "  publish-test - Build and publish to TestPyPI (uses ~/.pypirc)"
+	@echo "  publish      - Build and publish to PyPI (uses ~/.pypirc)"
