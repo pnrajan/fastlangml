@@ -22,8 +22,8 @@ ORIGIN="origin/$BRANCH"
 
 # Check if origin branch exists
 if ! git rev-parse --verify "$ORIGIN" > /dev/null 2>&1; then
-    echo -e "${YELLOW}No remote tracking branch. Comparing against HEAD.${NC}"
-    ORIGIN="HEAD"
+    echo -e "${YELLOW}No remote tracking branch. Comparing against HEAD~1.${NC}"
+    ORIGIN="HEAD~1"
 fi
 
 # Stage all changes
@@ -49,83 +49,117 @@ echo
 CHANGES=$(git diff --name-status "$ORIGIN" 2>/dev/null || git diff --cached --name-status)
 DIFF=$(git diff "$ORIGIN" 2>/dev/null || git diff --cached)
 
-# Analyze changes to build commit message
-MSG_PARTS=()
+# Arrays for title keywords and bullet points
+TITLE_PARTS=()
+BULLETS=()
 
-# Check for specific patterns in the diff
+# Analyze result.py changes
 if echo "$CHANGES" | grep -q "result.py"; then
     if echo "$DIFF" | grep -q "__str__\|__eq__"; then
-        MSG_PARTS+=("simplified API with __str__/__eq__")
+        TITLE_PARTS+=("simplified API")
+        BULLETS+=("Add __str__ and __eq__ to DetectionResult for cleaner usage")
     fi
 fi
 
-if echo "$CHANGES" | grep -q "README"; then
-    MSG_PARTS+=("updated README")
-fi
-
-if echo "$CHANGES" | grep -q "CHANGELOG"; then
-    MSG_PARTS+=("updated CHANGELOG")
-fi
-
-if echo "$CHANGES" | grep -q "pyproject.toml\|poetry.lock"; then
-    if echo "$DIFF" | grep -q "twine\|build"; then
-        MSG_PARTS+=("added twine/build for publishing")
-    elif echo "$DIFF" | grep -q "diskcache\|redis"; then
-        MSG_PARTS+=("added storage dependencies")
-    elif echo "$DIFF" | grep -q "version"; then
-        MSG_PARTS+=("version bump")
-    else
-        MSG_PARTS+=("updated dependencies")
+# Analyze store changes
+if echo "$CHANGES" | grep -q "store.py\|disk_store\|redis_store"; then
+    TITLE_PARTS+=("context persistence")
+    if echo "$CHANGES" | grep -q "disk_store"; then
+        BULLETS+=("Add DiskContextStore for file-based session storage")
+    fi
+    if echo "$CHANGES" | grep -q "redis_store"; then
+        BULLETS+=("Add RedisContextStore for production deployments")
     fi
 fi
 
+# Analyze pyproject.toml
+if echo "$CHANGES" | grep -q "pyproject.toml"; then
+    if echo "$DIFF" | grep -q "twine"; then
+        BULLETS+=("Add twine/build for PyPI publishing")
+    fi
+    if echo "$DIFF" | grep -q "diskcache\|redis"; then
+        BULLETS+=("Add optional storage dependencies (diskcache, redis)")
+    fi
+    if echo "$DIFF" | grep -qE '^\+version\s*=\s*"[0-9]'; then
+        VERSION=$(echo "$DIFF" | grep -oE '^\+version\s*=\s*"[^"]+"' | grep -oE '"[^"]+"' | tr -d '"')
+        if [ -n "$VERSION" ]; then
+            TITLE_PARTS=("v$VERSION" "${TITLE_PARTS[@]}")
+        fi
+    fi
+fi
+
+# Analyze Makefile
 if echo "$CHANGES" | grep -q "Makefile"; then
     if echo "$DIFF" | grep -q "commit"; then
-        MSG_PARTS+=("added commit helper")
-    elif echo "$DIFF" | grep -q "twine"; then
-        MSG_PARTS+=("switched to twine for publishing")
+        BULLETS+=("Add commit helper to Makefile")
+    fi
+    if echo "$DIFF" | grep -q "twine"; then
+        BULLETS+=("Switch publish target to use twine")
+    fi
+    if echo "$DIFF" | grep -q "poetry run"; then
+        BULLETS+=("Update Makefile to use Poetry commands")
+    fi
+fi
+
+# Analyze scripts
+if echo "$CHANGES" | grep -q "^A.*scripts/"; then
+    SCRIPT_NAME=$(echo "$CHANGES" | grep "^A.*scripts/" | head -1 | cut -f2 | xargs basename)
+    BULLETS+=("Add $SCRIPT_NAME for interactive commits")
+fi
+
+# Analyze README
+if echo "$CHANGES" | grep -q "README"; then
+    if echo "$DIFF" | grep -q "Quick Start\|Usage"; then
+        BULLETS+=("Update README with simplified API examples")
     else
-        MSG_PARTS+=("updated Makefile")
+        BULLETS+=("Update README documentation")
     fi
 fi
 
-if echo "$CHANGES" | grep -q "scripts/"; then
-    NEW_SCRIPTS=$(echo "$CHANGES" | grep "^A.*scripts/" | cut -f2 | xargs -I{} basename {} 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
-    if [ -n "$NEW_SCRIPTS" ]; then
-        MSG_PARTS+=("added $NEW_SCRIPTS script")
+# Analyze CHANGELOG
+if echo "$CHANGES" | grep -q "CHANGELOG"; then
+    BULLETS+=("Update CHANGELOG")
+fi
+
+# Analyze tests
+if echo "$CHANGES" | grep -qE "test.*\.py"; then
+    TEST_COUNT=$(echo "$CHANGES" | grep -cE "test.*\.py" || echo "0")
+    if echo "$CHANGES" | grep -qE "^A.*test"; then
+        BULLETS+=("Add new tests")
+    elif [ "$TEST_COUNT" -gt 0 ]; then
+        BULLETS+=("Update tests")
     fi
 fi
 
-if echo "$CHANGES" | grep -q "store.py\|disk_store\|redis_store"; then
-    MSG_PARTS+=("added context persistence stores")
-fi
-
-if echo "$CHANGES" | grep -qE "^A.*test"; then
-    MSG_PARTS+=("added tests")
-fi
-
-if echo "$CHANGES" | grep -qE "^M.*test"; then
-    MSG_PARTS+=("updated tests")
-fi
-
-# Build the message
-if [ ${#MSG_PARTS[@]} -eq 0 ]; then
-    # Fallback: count files
+# Build the title
+if [ ${#TITLE_PARTS[@]} -eq 0 ]; then
+    # Fallback title
     FILE_COUNT=$(echo "$CHANGES" | wc -l | tr -d ' ')
-    COMMIT_MSG="Update $FILE_COUNT files"
+    TITLE="Update $FILE_COUNT files"
 else
-    # Join parts with comma
-    COMMIT_MSG=$(IFS=", "; echo "${MSG_PARTS[*]}")
+    TITLE=$(IFS=" and "; echo "${TITLE_PARTS[*]}")
     # Capitalize first letter
-    COMMIT_MSG="$(echo "${COMMIT_MSG:0:1}" | tr '[:lower:]' '[:upper:]')${COMMIT_MSG:1}"
+    TITLE="$(echo "${TITLE:0:1}" | tr '[:lower:]' '[:upper:]')${TITLE:1}"
+fi
+
+# Build full commit message
+COMMIT_MSG="$TITLE"
+if [ ${#BULLETS[@]} -gt 0 ]; then
+    COMMIT_MSG="$TITLE
+
+"
+    for bullet in "${BULLETS[@]}"; do
+        COMMIT_MSG="$COMMIT_MSG- $bullet
+"
+    done
 fi
 
 # Show generated message
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}Generated commit message:${NC}"
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo
-echo -e "  ${YELLOW}$COMMIT_MSG${NC}"
-echo
+echo -e "${YELLOW}$COMMIT_MSG${NC}"
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo
 
@@ -141,25 +175,25 @@ case $ACTION in
     1)
         git commit -m "$COMMIT_MSG"
         echo -e "${GREEN}✓ Committed${NC}"
+        git log --oneline -1
         ;;
     2)
         git commit -m "$COMMIT_MSG"
         git push origin "$BRANCH"
         echo -e "${GREEN}✓ Committed and pushed${NC}"
+        git log --oneline -1
         ;;
     3)
-        read -p "Enter message: " CUSTOM_MSG
-        if [ -n "$CUSTOM_MSG" ]; then
-            git commit -m "$CUSTOM_MSG"
-            echo -e "${GREEN}✓ Committed${NC}"
-            read -p "Push? [y/N]: " PUSH
-            if [[ "$PUSH" =~ ^[Yy]$ ]]; then
-                git push origin "$BRANCH"
-                echo -e "${GREEN}✓ Pushed${NC}"
-            fi
-        else
-            echo -e "${RED}No message provided${NC}"
-            exit 1
+        echo "$COMMIT_MSG" > /tmp/commit_msg.txt
+        ${EDITOR:-vim} /tmp/commit_msg.txt
+        git commit -F /tmp/commit_msg.txt
+        rm /tmp/commit_msg.txt
+        echo -e "${GREEN}✓ Committed${NC}"
+        git log --oneline -1
+        read -p "Push? [y/N]: " PUSH
+        if [[ "$PUSH" =~ ^[Yy]$ ]]; then
+            git push origin "$BRANCH"
+            echo -e "${GREEN}✓ Pushed${NC}"
         fi
         ;;
     *)
