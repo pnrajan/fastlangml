@@ -52,17 +52,20 @@ class FastLangIDBackend(Backend):
             )
 
         try:
-            # fastlangid returns dict with 'lang' and 'score' keys
-            result = self._langid.predict(text)
-
-            lang = result.get("lang", "unknown")
-            confidence = float(result.get("score", 0.0))
+            # predict() returns a bare code by default. With prob=True it returns
+            # (lang, p) or [(lang, p), ...] depending on the language, so ask for
+            # k > 1 to always get a list.
+            ranked = self._langid.predict(text, k=3, prob=True)
+            if isinstance(ranked, tuple):
+                ranked = [ranked]
+            probabilities = {str(lang): float(p) for lang, p in ranked}
+            lang, confidence = max(probabilities.items(), key=lambda item: item[1])
 
             return DetectionResult(
                 backend_name=self.name,
                 language=lang,
                 confidence=confidence,
-                all_probabilities={lang: confidence},
+                all_probabilities=probabilities,
                 is_reliable=confidence > 0.5,
             )
         except Exception:
