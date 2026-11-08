@@ -5,6 +5,23 @@ All notable changes to FastLangML will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- CI: `pip install -e ".[dev]"` installed no test tools because `dev` was only a
+  Poetry group. Added a `dev` extra so pytest, ruff, and mypy install in CI.
+- Result cache ignored conversation context. A cached result skipped the context
+  boost and the context update, and results boosted by one conversation were
+  served to unrelated calls. Calls that pass `context` now bypass the cache.
+- mypy errors: cache key type (`LRUCache[str, ...]` held tuple keys) and a
+  shadowed `detect` name in backend discovery.
+
+### Changed
+
+- Rewrote README: corrected signatures and defaults, removed examples that did
+  not produce the documented output, documented the CLI.
+
 ## [1.1.0] - 2025-01-08
 
 ### Added
