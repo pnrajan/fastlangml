@@ -14,8 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Result cache ignored conversation context. A cached result skipped the context
   boost and the context update, and results boosted by one conversation were
   served to unrelated calls. Calls that pass `context` now bypass the cache.
+- The cache key ignored `filter_proper_nouns` and per-call `hints`, so a result
+  computed with one setting could be returned for another. `add_hint()` and
+  `remove_hint()` now clear the cache, so new hints take effect immediately.
+- Undetermined (`und`) results are no longer added to conversation context.
+  Before, some `und` paths added a turn and others didn't, and a turn added
+  this way pushed real history out of the `max_turns` window.
 - mypy errors: cache key type (`LRUCache[str, ...]` held tuple keys) and a
   shadowed `detect` name in backend discovery.
+
+### Added
+
+- `tests/test_detector_core.py`: deterministic tests for caching, context, hints,
+  proper-noun filtering, and "und" handling, using scripted fake backends.
+- PR test report workflow: every new or updated pull request gets a comment
+  listing every test case and its result (also shown in the job summary).
+
+### Known issues
+
+- The top language's confidence is always 1.0 (scores are divided by the top
+  score), so default thresholds never mark a result unreliable. Tracked by an
+  `xfail` test.
 
 ### Changed
 

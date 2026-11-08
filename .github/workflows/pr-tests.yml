@@ -1,0 +1,71 @@
+name: PR Test Report
+
+# On every new or updated pull request: run the test suite, then list every
+# test case with its result in the job summary and in a PR comment.
+# The comment is updated in place on each push instead of adding a new one.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,langdetect,langid,lingua]"
+
+      - name: Run tests
+        id: tests
+        continue-on-error: true
+        run: |
+          python -m pytest tests/ --ignore=tests/test_benchmarks.py \
+            --junitxml=report.xml -o junit_family=xunit1 -q
+
+      - name: Build report
+        if: always()
+        run: |
+          python scripts/pr_test_report.py report.xml > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update PR comment
+        if: always()
+        # Fork PRs get a read-only token; the job summary still has the report.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          marker='<!-- fastlangml-test-report -->'
+          comment_id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n1)
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$comment_id" -F body=@report.md > /dev/null
+            echo "Updated comment $comment_id"
+          else
+            gh pr comment "$PR" --repo "$REPO" --body-file report.md
+          fi
+
+      - name: Fail if tests failed
+        if: steps.tests.outcome == 'failure'
+        run: |
+          echo "::error::Test suite failed; see the report above."
+          exit 1

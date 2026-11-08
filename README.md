@@ -166,6 +166,8 @@ How it works: each candidate language gets a small score boost based on how ofte
 A common use is routing a whole conversation by `ctx.dominant_language` rather than trusting any single short message.
 
 > **Note:** `detect()` updates the context by default (`auto_update=True`). `FastLangDetector.detect()` does **not** (`auto_update=False`). Pass `auto_update=True`, or call `ctx.add_turn(text, result.lang, result.confidence)` yourself.
+>
+> Undetermined results (`und`) are never added to the context, so empty or noisy messages don't push real history out.
 
 ### Saving context between requests
 
@@ -445,7 +447,7 @@ ctx.to_dict() / ConversationContext.from_dict(d) / ConversationContext.from_hist
 
 ## Performance
 
-- **Cache:** repeated texts are served from an LRU cache (`cache_size`). Calls that pass a `context` skip the cache, since context can change the result.
+- **Cache:** repeated texts are served from an LRU cache (`cache_size`). Calls that pass a `context` or per-call `hints` skip the cache, since those can change the result. `add_hint()` and `remove_hint()` clear the cache.
 - **Script short-circuit:** text in a writing system used by only one language (Korean, Thai, Hebrew, Armenian, Georgian, Tamil, Telugu, Kannada, Malayalam, Gujarati, Bengali, Punjabi, Oriya, Sinhala, Khmer, Lao, Myanmar, Tibetan) is answered without running any backend.
 - **Lazy loading:** backends load their models on first use. Expect the first call to take a few seconds; later calls take milliseconds.
 - **Batching:** `detect_batch()` is faster than calling `detect()` in a loop.
