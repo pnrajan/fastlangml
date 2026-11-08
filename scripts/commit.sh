@@ -1,9 +1,17 @@
 #!/bin/bash
 #
-# Smart commit: analyzes changes vs origin and generates informative commit message
+# Interactive commit helper.
+#
+# Builds a commit message from the *staged* changes only, then lets you
+# commit, commit and push, edit the message, or cancel.
+#
+#   - Nothing staged? Offers to stage modified tracked files (`git add -u`).
+#     Untracked files are never added automatically.
+#   - Cancelling only unstages what this script staged.
+#   - Nothing to commit but unpushed commits? Offers to push them.
 #
 
-set -e
+set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -11,194 +19,196 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Check if we're in a git repo
-if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-    echo -e "${RED}Error: Not in a git repository${NC}"
-    exit 1
-fi
+info() { echo -e "${BLUE}$*${NC}"; }
+ok()   { echo -e "${GREEN}✓ $*${NC}"; }
+warn() { echo -e "${YELLOW}$*${NC}"; }
+die()  { echo -e "${RED}Error: $*${NC}" >&2; exit 1; }
+
+git rev-parse --is-inside-work-tree > /dev/null 2>&1 || die "not in a git repository"
 
 BRANCH=$(git branch --show-current)
-ORIGIN="origin/$BRANCH"
+[ -n "$BRANCH" ] || die "detached HEAD; check out a branch first"
 
-# Check if origin branch exists
-if ! git rev-parse --verify "$ORIGIN" > /dev/null 2>&1; then
-    echo -e "${YELLOW}No remote tracking branch. Comparing against HEAD~1.${NC}"
-    ORIGIN="HEAD~1"
-fi
-
-# Stage all changes
-git add -A
-
-# Check for changes
-if git diff --cached --quiet && git diff "$ORIGIN"..HEAD --quiet 2>/dev/null; then
-    echo -e "${YELLOW}No changes to commit${NC}"
-    exit 0
-fi
-
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${BLUE}  Comparing $BRANCH vs $ORIGIN${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo
-
-# Show what's different from origin
-echo -e "${GREEN}Changed files:${NC}"
-git diff --name-status "$ORIGIN" 2>/dev/null || git diff --cached --name-status
-echo
-
-# Collect all changes for analysis
-CHANGES=$(git diff --name-status "$ORIGIN" 2>/dev/null || git diff --cached --name-status)
-DIFF=$(git diff "$ORIGIN" 2>/dev/null || git diff --cached)
-
-# Arrays for title keywords and bullet points
-TITLE_PARTS=()
-BULLETS=()
-
-# Analyze result.py changes
-if echo "$CHANGES" | grep -q "result.py"; then
-    if echo "$DIFF" | grep -q "__str__\|__eq__"; then
-        TITLE_PARTS+=("simplified API")
-        BULLETS+=("Add __str__ and __eq__ to DetectionResult for cleaner usage")
+push_branch() {
+    if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' > /dev/null 2>&1; then
+        git push
+    else
+        git push -u origin "$BRANCH"
     fi
-fi
+    ok "Pushed $BRANCH"
+}
 
-# Analyze store changes
-if echo "$CHANGES" | grep -q "store.py\|disk_store\|redis_store"; then
-    TITLE_PARTS+=("context persistence")
-    if echo "$CHANGES" | grep -q "disk_store"; then
-        BULLETS+=("Add DiskContextStore for file-based session storage")
+unpushed_count() {
+    if git rev-parse --verify --quiet "origin/$BRANCH" > /dev/null; then
+        git rev-list --count "origin/$BRANCH..HEAD"
+    else
+        git rev-list --count HEAD
     fi
-    if echo "$CHANGES" | grep -q "redis_store"; then
-        BULLETS+=("Add RedisContextStore for production deployments")
-    fi
-fi
+}
 
-# Analyze pyproject.toml
-if echo "$CHANGES" | grep -q "pyproject.toml"; then
-    if echo "$DIFF" | grep -q "twine"; then
-        BULLETS+=("Add twine/build for PyPI publishing")
-    fi
-    if echo "$DIFF" | grep -q "diskcache\|redis"; then
-        BULLETS+=("Add optional storage dependencies (diskcache, redis)")
-    fi
-    if echo "$DIFF" | grep -qE '^\+version\s*=\s*"[0-9]'; then
-        VERSION=$(echo "$DIFF" | grep -oE '^\+version\s*=\s*"[^"]+"' | grep -oE '"[^"]+"' | tr -d '"')
-        if [ -n "$VERSION" ]; then
-            TITLE_PARTS=("v$VERSION" "${TITLE_PARTS[@]}")
+# --- Make sure something is staged -------------------------------------------
+
+STAGED_BY_SCRIPT=0
+if git diff --cached --quiet; then
+    if ! git diff --quiet; then
+        warn "Nothing staged. Modified tracked files:"
+        git diff --name-status
+        echo
+        read -r -p "Stage these with 'git add -u'? [y/N]: " STAGE
+        if [[ "$STAGE" =~ ^[Yy]$ ]]; then
+            git add -u
+            STAGED_BY_SCRIPT=1
         fi
     fi
 fi
 
-# Analyze Makefile
-if echo "$CHANGES" | grep -q "Makefile"; then
-    if echo "$DIFF" | grep -q "commit"; then
-        BULLETS+=("Add commit helper to Makefile")
-    fi
-    if echo "$DIFF" | grep -q "twine"; then
-        BULLETS+=("Switch publish target to use twine")
-    fi
-    if echo "$DIFF" | grep -q "poetry run"; then
-        BULLETS+=("Update Makefile to use Poetry commands")
-    fi
-fi
-
-# Analyze scripts
-if echo "$CHANGES" | grep -q "^A.*scripts/"; then
-    SCRIPT_NAME=$(echo "$CHANGES" | grep "^A.*scripts/" | head -1 | cut -f2 | xargs basename)
-    BULLETS+=("Add $SCRIPT_NAME for interactive commits")
-fi
-
-# Analyze README
-if echo "$CHANGES" | grep -q "README"; then
-    if echo "$DIFF" | grep -q "Quick Start\|Usage"; then
-        BULLETS+=("Update README with simplified API examples")
+if git diff --cached --quiet; then
+    UNPUSHED=$(unpushed_count)
+    if [ "$UNPUSHED" -gt 0 ]; then
+        warn "Nothing to commit, but $UNPUSHED unpushed commit(s) on $BRANCH."
+        read -r -p "Push now? [y/N]: " PUSH
+        [[ "$PUSH" =~ ^[Yy]$ ]] && push_branch
     else
-        BULLETS+=("Update README documentation")
+        warn "Nothing to commit."
     fi
+    exit 0
 fi
 
-# Analyze CHANGELOG
-if echo "$CHANGES" | grep -q "CHANGELOG"; then
-    BULLETS+=("Update CHANGELOG")
+# --- Analyze staged changes ---------------------------------------------------
+
+info "═══════════════════════════════════════"
+info "  Staged changes on $BRANCH"
+info "═══════════════════════════════════════"
+git diff --cached --name-status
+echo
+
+CHANGES=$(git diff --cached --name-status)
+
+# Lines added in a given path (without the leading '+').
+added_in() {
+    git diff --cached -- "$@" | grep '^+[^+]' | cut -c2- || true
+}
+# True if any of the staged paths match the pattern.
+touched() {
+    echo "$CHANGES" | cut -f2- | grep -qE "$1"
+}
+# True if a path with this status (A, M, D, ...) matches the pattern.
+touched_with() {
+    echo "$CHANGES" | awk -F'\t' -v s="$1" -v p="$2" \
+        'substr($1, 1, 1) == s && $NF ~ p { found = 1 } END { exit !found }'
+}
+
+TITLE_PARTS=()
+BULLETS=()
+
+if touched 'src/.*\.py$'; then
+    TITLE_PARTS+=("update library code")
 fi
 
-# Analyze tests
-if echo "$CHANGES" | grep -qE "test.*\.py"; then
-    TEST_COUNT=$(echo "$CHANGES" | grep -cE "test.*\.py" || echo "0")
-    if echo "$CHANGES" | grep -qE "^A.*test"; then
-        BULLETS+=("Add new tests")
-    elif [ "$TEST_COUNT" -gt 0 ]; then
+if touched 'pyproject\.toml$'; then
+    PYPROJECT_ADDED=$(added_in pyproject.toml)
+    NEW_VERSION=$(echo "$PYPROJECT_ADDED" | sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' | head -1)
+    if [ -n "$NEW_VERSION" ]; then
+        TITLE_PARTS=("release v$NEW_VERSION" ${TITLE_PARTS[@]+"${TITLE_PARTS[@]}"})
+        BULLETS+=("Bump version to $NEW_VERSION")
+    fi
+    BULLETS+=("Update pyproject.toml")
+fi
+touched 'poetry\.lock$' && BULLETS+=("Update poetry.lock")
+
+if touched '^tests/'; then
+    if touched_with A '^tests/'; then
+        BULLETS+=("Add tests")
+    else
         BULLETS+=("Update tests")
     fi
 fi
 
-# Build the title
-if [ ${#TITLE_PARTS[@]} -eq 0 ]; then
-    # Fallback title
-    FILE_COUNT=$(echo "$CHANGES" | wc -l | tr -d ' ')
-    TITLE="Update $FILE_COUNT files"
-else
-    TITLE=$(IFS=" and "; echo "${TITLE_PARTS[*]}")
-    # Capitalize first letter
-    TITLE="$(echo "${TITLE:0:1}" | tr '[:lower:]' '[:upper:]')${TITLE:1}"
+touched '(^|/)README' && BULLETS+=("Update README")
+touched '(^|/)CHANGELOG' && BULLETS+=("Update CHANGELOG")
+touched '^\.github/' && BULLETS+=("Update CI workflows")
+touched '(^|/)Makefile$' && BULLETS+=("Update Makefile")
+
+if touched '^scripts/'; then
+    while IFS= read -r path; do
+        BULLETS+=("Add $(basename "$path")")
+    done < <(echo "$CHANGES" | awk -F'\t' '$1 == "A" && $2 ~ /^scripts\// {print $2}')
+    touched_with M '^scripts/' && BULLETS+=("Update scripts")
 fi
 
-# Build full commit message
+# --- Build message ------------------------------------------------------------
+
+FILE_COUNT=$(echo "$CHANGES" | grep -c . || true)
+if [ ${#TITLE_PARTS[@]} -eq 0 ]; then
+    if [ "$FILE_COUNT" -eq 1 ]; then
+        TITLE="Update $(echo "$CHANGES" | cut -f2- | tail -1)"
+    else
+        TITLE="Update $FILE_COUNT files"
+    fi
+else
+    TITLE=""
+    for part in "${TITLE_PARTS[@]}"; do
+        TITLE="${TITLE:+$TITLE, }$part"
+    done
+fi
+TITLE="$(echo "${TITLE:0:1}" | tr '[:lower:]' '[:upper:]')${TITLE:1}"
+
 COMMIT_MSG="$TITLE"
 if [ ${#BULLETS[@]} -gt 0 ]; then
-    COMMIT_MSG="$TITLE
-
-"
+    COMMIT_MSG+=$'\n'
     for bullet in "${BULLETS[@]}"; do
-        COMMIT_MSG="$COMMIT_MSG- $bullet
-"
+        COMMIT_MSG+=$'\n'"- $bullet"
     done
 fi
 
-# Show generated message
-echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}Generated commit message:${NC}"
-echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo
-echo -e "${YELLOW}$COMMIT_MSG${NC}"
-echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo -e "${YELLOW}${COMMIT_MSG}${NC}"
 echo
 
-# Options
+# --- Act ----------------------------------------------------------------------
+
+cancel() {
+    warn "Cancelled"
+    if [ "$STAGED_BY_SCRIPT" -eq 1 ]; then
+        git reset -q
+    fi
+    exit 0
+}
+
 echo "1) Commit"
 echo "2) Commit and push"
-echo "3) Edit message"
+echo "3) Edit message, then commit"
 echo "4) Cancel"
 echo
-read -p "Select [1-4]: " ACTION
+read -r -p "Select [1-4]: " ACTION
 
-case $ACTION in
+case "$ACTION" in
     1)
         git commit -m "$COMMIT_MSG"
-        echo -e "${GREEN}✓ Committed${NC}"
-        git log --oneline -1
+        ok "Committed"
         ;;
     2)
         git commit -m "$COMMIT_MSG"
-        git push origin "$BRANCH"
-        echo -e "${GREEN}✓ Committed and pushed${NC}"
-        git log --oneline -1
+        ok "Committed"
+        push_branch
         ;;
     3)
-        echo "$COMMIT_MSG" > /tmp/commit_msg.txt
-        ${EDITOR:-vim} /tmp/commit_msg.txt
-        git commit -F /tmp/commit_msg.txt
-        rm /tmp/commit_msg.txt
-        echo -e "${GREEN}✓ Committed${NC}"
-        git log --oneline -1
-        read -p "Push? [y/N]: " PUSH
-        if [[ "$PUSH" =~ ^[Yy]$ ]]; then
-            git push origin "$BRANCH"
-            echo -e "${GREEN}✓ Pushed${NC}"
+        MSG_FILE=$(mktemp "${TMPDIR:-/tmp}/commit_msg.XXXXXX")
+        trap 'rm -f "$MSG_FILE"' EXIT
+        printf '%s\n' "$COMMIT_MSG" > "$MSG_FILE"
+        "${EDITOR:-vi}" "$MSG_FILE"
+        if ! grep -q '[^[:space:]]' "$MSG_FILE"; then
+            cancel
         fi
+        git commit -F "$MSG_FILE"
+        ok "Committed"
+        read -r -p "Push? [y/N]: " PUSH
+        [[ "$PUSH" =~ ^[Yy]$ ]] && push_branch
         ;;
     *)
-        echo -e "${YELLOW}Cancelled${NC}"
-        git reset HEAD > /dev/null 2>&1 || true
-        exit 0
+        cancel
         ;;
 esac
+
+git log --oneline -1
