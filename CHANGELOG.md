@@ -20,6 +20,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Undetermined (`und`) results are no longer added to conversation context.
   Before, some `und` paths added a turn and others didn't, and a turn added
   this way pushed real history out of the `max_turns` window.
+- CLI: output options before the command were broken. `fastlangml --pretty
+  backends` detected the language of the word "backends", and `-f table` before
+  `detect` was overwritten by the subcommand default. Options now work before
+  or after the command, and `fastlangml -- TEXT` detects text that looks like a
+  flag.
+- `detect_batch()` could hang forever with 3 or more backends and texts longer
+  than 20 characters: batch jobs and backend jobs shared one thread pool, so
+  batch jobs waited on backend jobs that could never start. Batch now uses its
+  own pool, and `max_workers` is honored instead of ignored.
+- `langid` backend always reported confidence 0.0 (it converted langid's raw
+  log score with `exp()`), so its vote never counted. It now uses langid's
+  normalized probabilities.
+- `fastlangid` backend never worked: it called `.get()` on the string
+  `predict()` returns, and the error was swallowed, so every text came back
+  `unknown`. It now reads real probabilities, so Chinese, Japanese, Korean and
+  Cantonese detection uses it as documented. `zh-yue` (fastlangid) and `yue`
+  (fastText) now both normalize to `zh-Yue`.
+- Hints: a text that is exactly one hinted word (like "thx") now gets the same
+  strong hint boost in every mode, not just `short`, and a detector configured with `mode="short"` now gets short-mode hint
+  handling (it previously only checked the per-call `mode` argument).
 - mypy errors: cache key type (`LRUCache[str, ...]` held tuple keys) and a
   shadowed `detect` name in backend discovery.
 
@@ -27,17 +47,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `tests/test_detector_core.py`: deterministic tests for caching, context, hints,
   proper-noun filtering, and "und" handling, using scripted fake backends.
+- `tests/test_builtin_backends.py`: checks each installed backend adapter returns
+  real, confident votes on clear sentences.
+- `tests/test_cli.py`: CLI argument routing and output options.
+- Workflows now have a 15-minute job timeout.
 - PR test report workflow: every new or updated pull request gets a comment
   listing every test case and its result (also shown in the job summary).
 
-### Known issues
-
-- The top language's confidence is always 1.0 (scores are divided by the top
-  score), so default thresholds never mark a result unreliable. Tracked by an
-  `xfail` test.
-
 ### Changed
 
+- **Confidence is now the winner's share of the combined backend vote.**
+  Before, every score was divided by the top score, so the winner always
+  reported 1.0, `reliable` was always True, and the per-mode thresholds never
+  applied. Now a 51/49 split reports about 0.51, and modes with a higher
+  threshold return `und` (`low_confidence` or `disagreement`) for close calls.
+  On the bundled benchmark samples, `short` mode (the `detect()` default) gets
+  the same number of answers right or more. In `default` mode a few one-word
+  inputs (for example "Salut") now return `und` instead of a guess.
 - Rewrote README: corrected signatures and defaults, removed examples that did
   not produce the documented output, documented the CLI.
 

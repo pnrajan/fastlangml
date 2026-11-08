@@ -46,6 +46,8 @@ pip install "fastlangml[all]"               # every backend and optional feature
 pip install "fastlangml[fasttext,lingua]"   # a good, smaller combination
 ```
 
+Include **fastText** if you detect single words or very short messages. On a set of common greetings ("Hello", "Hola", "Ciao", "Merci", ...), `fasttext` + `lingua` got 8 of 8 right. `lingua`, `langid` and `langdetect` without fastText got 3 of 8. All backends do well on full sentences.
+
 | Extra | Backend | Languages | Notes |
 |-------|---------|-----------|-------|
 | `fasttext` | fastText (`lid.176`) | 176 | Fast, broad coverage. Pins `numpy<2`. |
@@ -113,7 +115,7 @@ from fastlangml import detect_batch
 detect_batch(["Hello there", "Bonjour à tous"])  # list of results
 ```
 
-`mode` sets the minimum length and confidence threshold:
+`confidence` is the winning language's share of the combined backend vote: 1.0 when every backend agrees, about 0.5 when two languages split the vote. `mode` sets the minimum text length and how much of the vote the winner needs. Below that, you get `und` with reason `low_confidence` (or `disagreement` when the top two are close).
 
 | Mode | Use for | Confidence threshold |
 |------|---------|----------------------|
@@ -133,13 +135,14 @@ fastlangml detect "Bonjour le monde"
 
 echo "Hola amigo" | fastlangml detect -          # read from stdin
 fastlangml detect --top-k 3 --short "ok"
-fastlangml detect -f table "Guten Morgen zusammen" # json | jsonl | table
+fastlangml -f table "Guten Morgen zusammen"        # json | jsonl | table
+fastlangml "Bonjour"                              # `detect` is the default command
 fastlangml batch messages.txt                    # one text per line
 fastlangml backends                              # list installed backends
 fastlangml bench --dataset wili --n-samples 1000 # accuracy benchmark
 ```
 
-Run `fastlangml <command> --help` for all flags.
+Output options (`-f/--format`, `-p/--pretty`, `--include-meta`) work before or after the command. Run `fastlangml <command> --help` for all flags.
 
 ---
 
@@ -276,7 +279,7 @@ detector.set_languages(["en", "es"])
 | `backend_weights` | `{}` | Per-backend weight for weighted voting |
 | `voting_strategy` | `"weighted"` | `"weighted"`, `"hard"`, `"soft"`, `"consensus"` |
 | `custom_voting` | `None` | A `VotingStrategy` instance; overrides `voting_strategy` |
-| `thresholds` | `{"short": 0.3, "default": 0.5, "long": 0.6}` | Confidence needed for `reliable=True` |
+| `thresholds` | `{"short": 0.3, "default": 0.5, "long": 0.6}` | Share of the vote the winner needs; below it the result is `und` |
 | `min_chars` | `{"short": 2, "default": 3, "long": 3}` | Shorter text returns `und` |
 | `min_letters` | `{"short": 1, "default": 2, "long": 2}` | Fewer letters returns `und` |
 | `min_letter_ratio` | `0.3` | Minimum share of letters in the text |
@@ -420,7 +423,7 @@ detector.cache_stats           # property: {"size": ..., "maxsize": ...}
 | Field | Type | Meaning |
 |-------|------|---------|
 | `lang` | `str` | ISO 639-1 code, or `"und"` |
-| `confidence` | `float` | 0.0 – 1.0 |
+| `confidence` | `float` | Winner's share of the backend vote, 0.0 – 1.0 |
 | `reliable` | `bool` | `confidence` ≥ the mode's threshold |
 | `reason` | `str \| None` | Why the result is `und` |
 | `script` | `str \| None` | Writing system, e.g. `"Latin"` |
@@ -450,7 +453,7 @@ ctx.to_dict() / ConversationContext.from_dict(d) / ConversationContext.from_hist
 - **Cache:** repeated texts are served from an LRU cache (`cache_size`). Calls that pass a `context` or per-call `hints` skip the cache, since those can change the result. `add_hint()` and `remove_hint()` clear the cache.
 - **Script short-circuit:** text in a writing system used by only one language (Korean, Thai, Hebrew, Armenian, Georgian, Tamil, Telugu, Kannada, Malayalam, Gujarati, Bengali, Punjabi, Oriya, Sinhala, Khmer, Lao, Myanmar, Tibetan) is answered without running any backend.
 - **Lazy loading:** backends load their models on first use. Expect the first call to take a few seconds; later calls take milliseconds.
-- **Batching:** `detect_batch()` is faster than calling `detect()` in a loop.
+- **Batching:** `detect_batch()` runs texts in parallel and is faster than calling `detect()` in a loop. Pass `max_workers=` to cap the number of threads.
 
 Run the benchmark on your own data and hardware:
 
