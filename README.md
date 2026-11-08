@@ -133,7 +133,7 @@ fastlangml detect "Bonjour le monde"
 
 echo "Hola amigo" | fastlangml detect -          # read from stdin
 fastlangml detect --top-k 3 --short "ok"
-fastlangml -f table detect "Guten Morgen"        # json | jsonl | table
+fastlangml detect -f table "Guten Morgen zusammen" # json | jsonl | table
 fastlangml batch messages.txt                    # one text per line
 fastlangml backends                              # list installed backends
 fastlangml bench --dataset wili --n-samples 1000 # accuracy benchmark

@@ -38,12 +38,9 @@ push_branch() {
     ok "Pushed $BRANCH"
 }
 
+# Commits on HEAD that no remote branch contains yet.
 unpushed_count() {
-    if git rev-parse --verify --quiet "origin/$BRANCH" > /dev/null; then
-        git rev-list --count "origin/$BRANCH..HEAD"
-    else
-        git rev-list --count HEAD
-    fi
+    git rev-list --count HEAD --not --remotes
 }
 
 # --- Make sure something is staged -------------------------------------------
@@ -90,12 +87,12 @@ added_in() {
 }
 # True if any of the staged paths match the pattern.
 touched() {
-    echo "$CHANGES" | cut -f2- | grep -qE "$1"
+    cut -f2- <<< "$CHANGES" | grep -E "$1" > /dev/null
 }
 # True if a path with this status (A, M, D, ...) matches the pattern.
 touched_with() {
-    echo "$CHANGES" | awk -F'\t' -v s="$1" -v p="$2" \
-        'substr($1, 1, 1) == s && $NF ~ p { found = 1 } END { exit !found }'
+    awk -F'\t' -v s="$1" -v p="$2" \
+        'substr($1, 1, 1) == s && $NF ~ p { found = 1 } END { exit !found }' <<< "$CHANGES"
 }
 
 TITLE_PARTS=()
@@ -197,7 +194,9 @@ case "$ACTION" in
         MSG_FILE=$(mktemp "${TMPDIR:-/tmp}/commit_msg.XXXXXX")
         trap 'rm -f "$MSG_FILE"' EXIT
         printf '%s\n' "$COMMIT_MSG" > "$MSG_FILE"
-        "${EDITOR:-vi}" "$MSG_FILE"
+        # Same editor git would use (GIT_EDITOR, core.editor, VISUAL, EDITOR);
+        # run through sh like git does so values such as "code --wait" work.
+        sh -c "$(git var GIT_EDITOR)"' "$@"' git-editor "$MSG_FILE"
         if ! grep -q '[^[:space:]]' "$MSG_FILE"; then
             cancel
         fi
