@@ -191,8 +191,11 @@ class FastLangDetector:
         self._voting = self._create_voting_strategy()
         self._cache = get_cache(self._config.cache_size)
 
-        # Persistent thread pool for parallel backend calls (lazy init)
-        self._executor: ThreadPoolExecutor | None = None
+        # Lazily created thread pools. Batch jobs call detect(), which may wait on
+        # backend jobs, so the two must not share a pool or a full batch pool
+        # deadlocks waiting on backend jobs that can never start.
+        self._executor: ThreadPoolExecutor | None = None  # backend calls
+        self._batch_executor: ThreadPoolExecutor | None = None  # detect_batch
 
     @classmethod
     def default(cls) -> FastLangDetector:
@@ -531,14 +534,16 @@ class FastLangDetector:
 
         # Apply hint boosting (stronger for short text mode)
         if hint_scores:
-            # For very short text, hints are more reliable than backends
+            # Hints dominate when the text is very short (short mode) or when the
+            # whole text is a single hinted word, like "thx": backends are trained
+            # on sentences, and the user told us what this word means.
             text_len = len(text.strip())
-            if mode == "short" and text_len <= 5:
-                # Very short text: hints dominate
+            whole_text_is_hint = merged_hints.get(detection_text.strip(" \t\n.,!?;:")) is not None
+            if (effective_mode == "short" and text_len <= 5) or whole_text_is_hint:
                 for lang, score in hint_scores.items():
                     ensemble_scores[lang] = ensemble_scores.get(lang, 0.0) + score * 2.0
             else:
-                hint_multiplier = 1.5 if mode == "short" else 1.0
+                hint_multiplier = 1.5 if effective_mode == "short" else 1.0
                 for lang, score in hint_scores.items():
                     current = ensemble_scores.get(lang, 0.0)
                     hint_boost = score * self._config.hint_weight * hint_multiplier
@@ -558,13 +563,14 @@ class FastLangDetector:
                 if lang in effective_langs_set
             }
 
-        # Normalize scores
-        if ensemble_scores:
-            max_score = max(ensemble_scores.values())
-            if max_score > 0:
-                ensemble_scores = {
-                    lang: min(score / max_score, 1.0) for lang, score in ensemble_scores.items()
-                }
+        # Confidence = each language's share of the total vote. Dividing by the
+        # top score instead would make the winner always 1.0, so the thresholds
+        # could never flag a close call.
+        total_score = sum(max(score, 0.0) for score in ensemble_scores.values())
+        if total_score > 0:
+            ensemble_scores = {
+                lang: max(score, 0.0) / total_score for lang, score in ensemble_scores.items()
+            }
 
         # Sort and build candidates
         sorted_results = sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)
@@ -706,7 +712,8 @@ class FastLangDetector:
             top_k: Number of candidates per result.
             mode: Detection mode.
             allowed_langs: Restrict to these languages.
-            max_workers: Max parallel workers (ignored, uses detector's pool).
+            max_workers: Max texts processed at once. Defaults to a shared pool
+                of max(backends, 4) workers.
 
         Returns:
             List of DetectionResult objects.
@@ -727,16 +734,19 @@ class FastLangDetector:
 
         results: list[DetectionResult | None] = [None] * len(texts)
 
-        # Reuse detector's executor or create one for batch
-        if self._executor is None:
-            self._executor = ThreadPoolExecutor(max_workers=max(len(self._backends), 4))
+        def run(pool: ThreadPoolExecutor) -> None:
+            futures = [pool.submit(detect_single, (i, text)) for i, text in enumerate(texts)]
+            for future in as_completed(futures):
+                idx, result = future.result()
+                results[idx] = result
 
-        futures = {
-            self._executor.submit(detect_single, (i, text)): i for i, text in enumerate(texts)
-        }
-        for future in as_completed(futures):
-            idx, result = future.result()
-            results[idx] = result
+        if max_workers is not None:
+            with ThreadPoolExecutor(max_workers=max(max_workers, 1)) as pool:
+                run(pool)
+        else:
+            if self._batch_executor is None:
+                self._batch_executor = ThreadPoolExecutor(max_workers=max(len(self._backends), 4))
+            run(self._batch_executor)
 
         return [r for r in results if r is not None]
 

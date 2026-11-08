@@ -169,18 +169,31 @@ class TestUndetermined:
         assert result == "und"
         assert result.reason == Reasons.LOW_CONFIDENCE
 
-    def test_top_confidence_is_normalized_to_one(self, make_detector):
-        # Current behavior: scores are divided by the top score, so the winner
-        # always reports confidence 1.0, even on a near-tie.
-        assert make_detector().detect(NEAR_TIE).confidence == 1.0
+    def test_confidence_is_share_of_the_vote(self, script, make_detector):
+        script.set("Bonjour tout le monde", ("fr", 0.9))
+        detector = make_detector()
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Known bug: top score is normalized to 1.0, so default thresholds "
-        "(0.3-0.6) never mark a near-tie as unreliable.",
-    )
-    def test_near_tie_is_unreliable_with_default_thresholds(self, make_detector):
-        assert not make_detector().detect(NEAR_TIE).reliable
+        assert detector.detect("Bonjour tout le monde").confidence == pytest.approx(1.0)
+        # es 0.80 vs pt 0.78 with equal weights: es gets 0.80 / 1.58 of the vote.
+        assert detector.detect(NEAR_TIE).confidence == pytest.approx(0.80 / 1.58, abs=1e-3)
+
+    def test_candidate_confidences_sum_to_one(self, make_detector):
+        result = make_detector().detect(NEAR_TIE, top_k=5)
+
+        assert sum(c.confidence for c in result.candidates) == pytest.approx(1.0, abs=1e-3)
+
+    def test_near_tie_is_rejected_by_strict_threshold(self, make_detector):
+        # "long" mode needs 60% of the vote; a 51/49 split is not enough, and
+        # because the two are so close the reason is "disagreement".
+        result = make_detector().detect(NEAR_TIE, mode="long")
+
+        assert result == "und"
+        assert not result.reliable
+        assert result.reason == Reasons.DISAGREEMENT
+
+    def test_near_tie_passes_lenient_threshold(self, make_detector):
+        # "short" mode needs 30%, so the narrow winner is still returned.
+        assert make_detector().detect(NEAR_TIE, mode="short") == "es"
 
     def test_script_short_circuit_skips_backends(self, script, make_detector):
         assert make_detector().detect("안녕하세요") == "ko"
@@ -345,6 +358,37 @@ class TestHints:
 
         assert detector.detect(NEAR_TIE) == "pt"
 
+    @pytest.mark.parametrize("mode", ["short", "default"])
+    def test_whole_text_hint_wins_over_dissenting_backends(self, script, make_detector, mode):
+        # Both backends vote for other languages; the hinted word still wins and
+        # passes the threshold, because the whole text is a word the user mapped.
+        # ("long" needs 60% of the vote and is meant for paragraphs, not words.)
+        script.set("mdr", a=("de", 0.5), b=("en", 0.5))
+        detector = make_detector()
+        detector.add_hint("mdr", "fr")
+
+        result = detector.detect("mdr", mode=mode)
+
+        assert result == "fr"
+        assert result.reliable
+
+    def test_configured_short_mode_enables_hint_dominance(self, script):
+        # "zz yy" is 5 chars and only partly hinted, so only short mode lets the
+        # hint dominate. The configured mode must count, not just the argument.
+        script.set("zz yy", ("en", 0.9))
+
+        def detector(mode: str) -> FastLangDetector:
+            d = FastLangDetector(
+                config=DetectionConfig(
+                    backends=["a", "b"], backend_weights={"a": 1.0, "b": 1.0}, mode=mode
+                )
+            )
+            d.add_hint("zz", "fr")
+            return d
+
+        assert detector("short").detect("zz yy") == "fr"
+        assert detector("default").detect("zz yy") == "en"
+
 
 class TestProperNounFilter:
     TEXT = "I love Paris and Berlin"
@@ -359,3 +403,50 @@ class TestProperNounFilter:
         make_detector().detect(self.TEXT, filter_proper_nouns=False)
 
         assert script.texts_seen() == {self.TEXT}
+
+
+# --- Batch detection ---------------------------------------------------------
+
+
+class TestBatch:
+    def _three_backend_detector(self, script) -> FastLangDetector:
+        register_backend("c", _fake_backend("c", script))
+        script.votes["c"] = {}
+        return FastLangDetector(
+            config=DetectionConfig(
+                backends=["a", "b", "c"], backend_weights={"a": 1.0, "b": 1.0, "c": 1.0}
+            )
+        )
+
+    def test_batch_with_parallel_backends_does_not_deadlock(self, script):
+        # 3+ backends and text over 20 chars makes detect() run backends in a
+        # thread pool. Batch jobs used to share that pool and wait on it forever.
+        import threading
+
+        detector = self._three_backend_detector(script)
+        texts = [f"This is a long enough sentence number {i}" for i in range(40)]
+        out: list = []
+        worker = threading.Thread(target=lambda: out.extend(detector.detect_batch(texts)))
+        worker.daemon = True
+        worker.start()
+        worker.join(timeout=20)
+
+        assert not worker.is_alive(), "detect_batch deadlocked"
+        assert len(out) == len(texts)
+
+    def test_batch_preserves_order(self, script, make_detector):
+        texts = ["Bonjour tout le monde", "Hello there my friend", "Hola a todos ustedes"]
+        script.set(texts[0], ("fr", 0.9))
+        script.set(texts[2], ("es", 0.9))
+
+        results = make_detector().detect_batch(texts)
+
+        assert [r.lang for r in results] == ["fr", "en", "es"]
+
+    def test_batch_honors_max_workers(self, script):
+        detector = self._three_backend_detector(script)
+        texts = [f"Another fairly long sentence here {i}" for i in range(10)]
+
+        results = detector.detect_batch(texts, max_workers=1)
+
+        assert len(results) == len(texts)
