@@ -675,6 +675,34 @@ def backends_command(args: argparse.Namespace) -> int:
     return 0
 
 
+# Global options that take a value, so the value isn't mistaken for a command.
+_GLOBAL_OPTIONS_WITH_VALUE = {"--format", "-f"}
+
+
+def _insert_default_command(argv: list[str], commands: set[str]) -> list[str]:
+    """Insert "detect" when no subcommand is given: `fastlangml "Bonjour"`.
+
+    Skips leading global options (and their values) to find the first
+    positional token. Only if that token is not a known command is "detect"
+    inserted, right before it, so `fastlangml --pretty backends` still runs
+    `backends`.
+    """
+    i = 0
+    while i < len(argv):
+        token = argv[i]
+        if token == "--":
+            # Everything after "--" is text, e.g. `fastlangml -- --not-a-flag`.
+            return argv[:i] + ["detect"] + argv[i:]
+        if not token.startswith("-") or token == "-":
+            break
+        if token in _GLOBAL_OPTIONS_WITH_VALUE:
+            i += 1  # skip the option's value too
+        i += 1
+    if i < len(argv) and argv[i] not in commands:
+        return argv[:i] + ["detect"] + argv[i:]
+    return argv
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for CLI."""
     parser = argparse.ArgumentParser(
@@ -717,9 +745,13 @@ def main(argv: list[str] | None = None) -> int:
     detect_parser.add_argument("--top-k", "-k", type=int, default=1)
     detect_parser.add_argument("--short", "-s", action="store_true")
     detect_parser.add_argument("--languages", "-l", type=str)
-    detect_parser.add_argument("--format", "-f", choices=["json", "jsonl", "table"], default="json")
-    detect_parser.add_argument("--pretty", "-p", action="store_true")
-    detect_parser.add_argument("--include-meta", action="store_true")
+    # Output options are accepted before or after the subcommand. SUPPRESS keeps
+    # a subcommand default from overwriting a value given globally.
+    detect_parser.add_argument(
+        "--format", "-f", choices=["json", "jsonl", "table"], default=argparse.SUPPRESS
+    )
+    detect_parser.add_argument("--pretty", "-p", action="store_true", default=argparse.SUPPRESS)
+    detect_parser.add_argument("--include-meta", action="store_true", default=argparse.SUPPRESS)
 
     # Batch subcommand
     batch_parser = subparsers.add_parser("batch", help="Batch process file")
@@ -727,8 +759,10 @@ def main(argv: list[str] | None = None) -> int:
     batch_parser.add_argument("--out", "-o", type=str, help="Output file (JSONL)")
     batch_parser.add_argument("--short", "-s", action="store_true")
     batch_parser.add_argument("--languages", "-l", type=str)
-    batch_parser.add_argument("--format", "-f", choices=["json", "jsonl"], default="json")
-    batch_parser.add_argument("--pretty", "-p", action="store_true")
+    batch_parser.add_argument(
+        "--format", "-f", choices=["json", "jsonl"], default=argparse.SUPPRESS
+    )
+    batch_parser.add_argument("--pretty", "-p", action="store_true", default=argparse.SUPPRESS)
 
     # Bench subcommand
     bench_parser = subparsers.add_parser("bench", help="Run benchmark")
@@ -741,19 +775,16 @@ def main(argv: list[str] | None = None) -> int:
 
     # Backends subcommand
     backends_parser = subparsers.add_parser("backends", help="List backends")
-    backends_parser.add_argument("--pretty", "-p", action="store_true")
+    backends_parser.add_argument("--pretty", "-p", action="store_true", default=argparse.SUPPRESS)
 
-    # Handle case when called without subcommand (direct text)
     if argv is None:
         argv = sys.argv[1:]
-
-    # Check if first arg looks like a command or text
-    commands = ["detect", "batch", "bench", "backends", "-h", "--help", "-V", "--version"]
-    if argv and argv[0] not in commands:
-        # Assume it's text for detection - prepend "detect"
-        argv = ["detect"] + argv
+    argv = _insert_default_command(list(argv), set(subparsers.choices))
 
     args = parser.parse_args(argv)
+
+    if args.command == "batch" and args.format == "table":
+        parser.error("batch supports --format json or jsonl, not table")
 
     # Handle subcommands
     if args.command == "detect":
