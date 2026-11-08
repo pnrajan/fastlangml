@@ -242,10 +242,12 @@ class FastLangDetector:
     def add_hint(self, word: str, language: str) -> None:
         """Add a single-token word -> language hint."""
         self._hints.add(word, language)
+        self._cache.clear()  # cached results may predate this hint
 
     def remove_hint(self, word: str) -> None:
         """Remove a hint."""
         self._hints.remove(word)
+        self._cache.clear()  # cached results may depend on this hint
 
     def _update_context_if_needed(
         self,
@@ -254,8 +256,12 @@ class FastLangDetector:
         context: ConversationContext | None,
         auto_update: bool,
     ) -> None:
-        """Update context with detection result if auto_update is enabled."""
-        if auto_update and context is not None:
+        """Record a detection in the context when auto_update is enabled.
+
+        Undetermined results ("und") are skipped: they carry no language signal
+        and would only push real history out of the max_turns window.
+        """
+        if auto_update and context is not None and result.lang != "und":
             context.add_turn(text, result.lang, result.confidence)
 
     def detect(
@@ -323,16 +329,23 @@ class FastLangDetector:
 
         # Check cache (include allowed_langs for correctness)
         # P1 Optimization: Use tuple key instead of string concatenation (faster hashing)
-        # Context changes the result, so only context-free calls use the cache.
-        # Otherwise a hit would skip the context boost and the context update.
+        # The key must cover every input that can change the result. Context and
+        # per-call hints change it in ways a key can't capture cheaply, so those
+        # calls skip the cache (a hit would also skip the context update).
+        effective_filter_nouns = (
+            filter_proper_nouns
+            if filter_proper_nouns is not None
+            else self._config.filter_proper_nouns
+        )
         cache_key = (
             (
                 text,
                 effective_mode,
                 top_k,
                 tuple(sorted(effective_langs_set)) if effective_langs_set else (),
+                effective_filter_nouns,
             )
-            if context is None
+            if context is None and not hints
             else None
         )
         if cache_key is not None:
@@ -405,11 +418,7 @@ class FastLangDetector:
 
         # Apply proper noun filter
         detection_text = processed
-        should_filter = (
-            filter_proper_nouns
-            if filter_proper_nouns is not None
-            else self._config.filter_proper_nouns
-        )
+        should_filter = effective_filter_nouns
         if should_filter:
             detection_text = self._proper_noun_filter.filter(processed)
             if not detection_text.strip():

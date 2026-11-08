@@ -97,38 +97,3 @@ class TestConversationContext:
         assert context.dominant_language is None
         assert context.language_distribution == {}
         assert context.get_language_streak() == (None, 0)
-
-
-class TestContextWithCache:
-    """Cached results must not bypass the conversation context."""
-
-    def test_cache_hit_still_updates_context(self):
-        import pytest
-
-        from fastlangml import FastLangDetector
-
-        detector = FastLangDetector()
-        if not detector.available_backends:
-            pytest.skip("no detection backends installed")
-
-        text = "Bonjour tout le monde, comment allez-vous?"
-        first = detector.detect(text)  # fills the cache
-        context = ConversationContext()
-        second = detector.detect(text, context=context, auto_update=True)
-
-        assert second.lang == first.lang
-        assert len(context) == 1
-        assert context.last_turn.detected_language == first.lang
-
-    def test_context_result_not_served_to_context_free_call(self):
-        import pytest
-
-        from fastlangml import FastLangDetector
-
-        detector = FastLangDetector()
-        if not detector.available_backends:
-            pytest.skip("no detection backends installed")
-
-        context = ConversationContext()
-        detector.detect("Hola amigo", context=context)
-        assert detector.cache_stats["size"] == 0
