@@ -214,7 +214,7 @@ def _check_import_available(name: str) -> bool:
 
             available = True
         elif name == "langdetect":
-            from langdetect import detect  # noqa: F401
+            import langdetect  # noqa: F401
 
             available = True
         elif name == "langid":

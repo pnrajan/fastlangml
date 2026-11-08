@@ -323,15 +323,22 @@ class FastLangDetector:
 
         # Check cache (include allowed_langs for correctness)
         # P1 Optimization: Use tuple key instead of string concatenation (faster hashing)
+        # Context changes the result, so only context-free calls use the cache.
+        # Otherwise a hit would skip the context boost and the context update.
         cache_key = (
-            text,
-            effective_mode,
-            top_k,
-            tuple(sorted(effective_langs_set)) if effective_langs_set else (),
+            (
+                text,
+                effective_mode,
+                top_k,
+                tuple(sorted(effective_langs_set)) if effective_langs_set else (),
+            )
+            if context is None
+            else None
         )
-        cached = self._cache.get(cache_key)
-        if cached is not None:
-            return cached
+        if cache_key is not None:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached
 
         # Normalize text
         processed = text
@@ -431,7 +438,8 @@ class FastLangDetector:
                         "short_circuit": True,
                     },
                 )
-                self._cache[cache_key] = result
+                if cache_key is not None:
+                    self._cache[cache_key] = result
                 self._update_context_if_needed(text, result, context, auto_update)
                 return result
 
@@ -585,7 +593,8 @@ class FastLangDetector:
                         ],
                     },
                 )
-                self._cache[cache_key] = result
+                if cache_key is not None:
+                    self._cache[cache_key] = result
                 self._update_context_if_needed(text, result, context, auto_update)
                 return result
 
@@ -630,7 +639,8 @@ class FastLangDetector:
                     ],
                 },
             )
-            self._cache[cache_key] = result
+            if cache_key is not None:
+                self._cache[cache_key] = result
             self._update_context_if_needed(text, result, context, auto_update)
             return result
 
@@ -666,7 +676,8 @@ class FastLangDetector:
             },
         )
 
-        self._cache[cache_key] = result
+        if cache_key is not None:
+            self._cache[cache_key] = result
         self._update_context_if_needed(text, result, context, auto_update)
         return result
 
