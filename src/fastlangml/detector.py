@@ -70,6 +70,13 @@ _UNAMBIGUOUS_SCRIPTS: dict[str, str] = {
     "Tibetan": "bo",
 }
 
+# Context never gets half the vote, so backends that agree always win.
+_MAX_CONTEXT_SHARE = 0.45
+# Words this short ("Bien", "ok") give context its full share.
+_CONTEXT_SHORT_TEXT_LETTERS = 4
+# From this many letters on, context only breaks near-ties.
+_CONTEXT_FULL_TEXT_LETTERS = 20
+
 
 @dataclass
 class DetectionConfig:
@@ -380,6 +387,24 @@ class FastLangDetector:
         min_chars = self._config.min_chars.get(effective_mode, 3)
         min_letters = self._config.min_letters.get(effective_mode, 2)
         sufficient, reason = is_sufficient_length_from_stats(stats, min_chars, min_letters)
+        if not sufficient and context and stats.n_letters > 0:
+            # Too short to read ("ok", "si"), but the conversation says which
+            # language we're in. Not recorded in context: it adds no evidence.
+            dist = context.language_distribution
+            if effective_langs_set:
+                dist = {lang: w for lang, w in dist.items() if lang in effective_langs_set}
+            if dist:
+                lang = max(dist, key=lambda k: dist[k])
+                return DetectionResult(
+                    lang=lang,
+                    confidence=round(_MAX_CONTEXT_SHARE * dist[lang], 4),
+                    reliable=False,
+                    backend="context",
+                    meta={
+                        "elapsed_ms": (time.perf_counter() - start_time) * 1000,
+                        "from_context": True,
+                    },
+                )
         if not sufficient:
             result = DetectionResult(
                 lang="und",
@@ -549,12 +574,6 @@ class FastLangDetector:
                     hint_boost = score * self._config.hint_weight * hint_multiplier
                     ensemble_scores[lang] = current + hint_boost
 
-        # Apply context
-        if context:
-            for lang in ensemble_scores:
-                boost = context.get_context_boost(lang)
-                ensemble_scores[lang] += boost * self._config.context_weight
-
         # Filter by allowed languages
         if effective_langs_set:
             ensemble_scores = {
@@ -572,11 +591,25 @@ class FastLangDetector:
                 lang: max(score, 0.0) / total_score for lang, score in ensemble_scores.items()
             }
 
+        # Conversation context votes alongside the backends.
+        if context:
+            ensemble_scores = self._blend_context(
+                ensemble_scores, context, stats.n_letters, effective_langs_set
+            )
+
         # Sort and build candidates
         sorted_results = sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)
 
+        # When the conversation's language wins a weak vote ("Bien" in a Spanish
+        # chat), return it as unreliable instead of "und": the history is evidence.
+        context_decides = bool(
+            context
+            and sorted_results
+            and normalize_lang_tag(sorted_results[0][0]) == context.dominant_language
+        )
+
         # Check for disagreement
-        if len(sorted_results) >= 2:
+        if len(sorted_results) >= 2 and not context_decides:
             diff = sorted_results[0][1] - sorted_results[1][1]
             threshold = self._config.thresholds.get(effective_mode, 0.5)
             if diff < 0.1 and sorted_results[0][1] < threshold:
@@ -631,7 +664,11 @@ class FastLangDetector:
         threshold = self._config.thresholds.get(effective_mode, 0.5)
 
         # Check confidence threshold
-        if top_score < threshold and self._config.unknown_policy.get("allow", True):
+        if (
+            top_score < threshold
+            and not context_decides
+            and self._config.unknown_policy.get("allow", True)
+        ):
             result = DetectionResult(
                 lang="und",
                 confidence=top_score,
@@ -691,6 +728,11 @@ class FastLangDetector:
             },
         )
 
+        if context_decides and top_score < threshold:
+            # Mostly an echo of the history, so don't record it as a new turn.
+            result.meta["from_context"] = True
+            return result
+
         if cache_key is not None:
             self._cache[cache_key] = result
         self._update_context_if_needed(text, result, context, auto_update)
@@ -749,6 +791,36 @@ class FastLangDetector:
             run(self._batch_executor)
 
         return [r for r in results if r is not None]
+
+    def _blend_context(
+        self,
+        shares: dict[str, float],
+        context: ConversationContext,
+        n_letters: int,
+        allowed: set[str] | None,
+    ) -> dict[str, float]:
+        """Mix the conversation's language history into the backend vote shares.
+
+        On full sentences context gets 0.3 x `context_weight` of the vote (0.06 by
+        default), enough to break near-ties only. The share rises toward
+        _MAX_CONTEXT_SHARE as text gets shorter: "Bien" or "ok" says little on
+        its own, so the conversation decides.
+        """
+        dist = context.language_distribution
+        if allowed:
+            dist = {lang: w for lang, w in dist.items() if lang in allowed}
+        if not dist:
+            return shares
+
+        base = min(max(0.3 * self._config.context_weight, 0.0), _MAX_CONTEXT_SHARE)
+        span = _CONTEXT_FULL_TEXT_LETTERS - _CONTEXT_SHORT_TEXT_LETTERS
+        shortness = min(1.0, max(0.0, (_CONTEXT_FULL_TEXT_LETTERS - n_letters) / span))
+        alpha = base + (_MAX_CONTEXT_SHARE - base) * shortness
+
+        blended = {lang: (1 - alpha) * share for lang, share in shares.items()}
+        for lang, weight in dist.items():
+            blended[lang] = blended.get(lang, 0.0) + alpha * weight
+        return blended
 
     def _needs_tiebreak(self, scores: dict[str, float]) -> bool:
         """Check if tie-breaking is needed.

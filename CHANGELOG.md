@@ -64,6 +64,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   On the bundled benchmark samples, `short` mode (the `detect()` default) gets
   the same number of answers right or more. In `default` mode a few one-word
   inputs (for example "Salut") now return `und` instead of a guess.
+- **Conversation context now decides short, ambiguous replies.** Before, the
+  context boost was at most 0.06 and only reached languages a backend had
+  already voted for, so "Bien" in a Spanish chat stayed German and "ok" was
+  always `und`. Now the conversation votes alongside the backends. On full
+  sentences it counts as before (`0.3 × context_weight`). On short text it
+  counts for more, up to 45% for words of 4 letters or fewer, so backends that
+  all agree still win. Text too short to read returns the conversation's main
+  language. When context picks a result below the mode's threshold, the result
+  has `reliable=False` and `meta["from_context"] = True`, and it is not added
+  back to the context. Context-aware benchmark: 40% → 70% with langdetect,
+  langid, and lingua; 90% with all backends.
+- Benchmarks: the context benchmarks now pass `auto_update=True`, so the
+  conversation history actually builds up. The short-text benchmark is an
+  expected failure when fastText isn't installed (the other backends score
+  about 70% on one-word greetings; with fastText it is 97%).
 - Rewrote README: corrected signatures and defaults, removed examples that did
   not produce the documented output, documented the CLI.
 
