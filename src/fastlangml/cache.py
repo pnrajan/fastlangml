@@ -6,15 +6,16 @@ especially useful for repeated short strings like "ok", "thanks", etc.
 
 from __future__ import annotations
 
+from collections.abc import Hashable
 from typing import Any
 
 from cachetools import LRUCache
 
 # Default cache for detection results
-_default_cache: LRUCache[str, Any] = LRUCache(maxsize=1000)
+_default_cache: LRUCache[Hashable, Any] = LRUCache(maxsize=1000)
 
 
-def get_cache(max_size: int = 1000) -> LRUCache[str, Any]:
+def get_cache(max_size: int = 1000) -> LRUCache[Hashable, Any]:
     """Get or create an LRU cache.
 
     Args:

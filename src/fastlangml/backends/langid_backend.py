@@ -28,10 +28,14 @@ class LangidBackend(Backend):
 
     def _get_classifier(self) -> object:
         if self._classifier is None:
-            import langid
+            from langid.langid import LanguageIdentifier, model
 
-            langid.set_languages(None)  # Use all languages
-            self._classifier = langid
+            # The module-level langid.classify() returns an unnormalized log
+            # score (around -50), not a probability. norm_probs=True makes
+            # classify() return a real 0-1 probability.
+            self._classifier = LanguageIdentifier.from_modelstring(
+                model, norm_probs=self._normalize
+            )
         return self._classifier
 
     @property
@@ -61,15 +65,9 @@ class LangidBackend(Backend):
             classifier = self._get_classifier()
             lang, confidence = classifier.classify(text)
 
-            # Langid returns log probabilities by default
-            # Convert to probability if needed
-            if confidence < 0:
-                import math
-
-                confidence = math.exp(confidence)
-
-            # Normalize to 0-1 range
-            confidence = min(max(confidence, 0.0), 1.0)
+            # Without normalization langid returns a log score; it is not a
+            # probability, so treat it as no confidence information.
+            confidence = min(max(float(confidence), 0.0), 1.0)
 
             return DetectionResult(
                 backend_name=self.name,

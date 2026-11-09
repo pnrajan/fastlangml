@@ -2,964 +2,485 @@
 
 [![PyPI](https://img.shields.io/pypi/v/fastlangml)](https://pypi.org/project/fastlangml/)
 [![Python](https://img.shields.io/pypi/pyversions/fastlangml)](https://pypi.org/project/fastlangml/)
+[![Tests](https://github.com/pnrajan/fastlangml/actions/workflows/tests.yml/badge.svg)](https://github.com/pnrajan/fastlangml/actions/workflows/tests.yml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**High-accuracy language detection for chat, SMS, and conversational text.** FastLangML combines multiple detection backends ([FastText](https://fasttext.cc/), [Lingua](https://github.com/pemistahl/lingua-py), [langdetect](https://github.com/Mimino666/langdetect), [pyCLD3](https://github.com/bsolomon1124/pycld3)) into a powerful ensemble that outperforms any single detector.
+Language detection for short, messy text: chat messages, SMS, support tickets.
 
-**Key Features:**
-- **170+ languages** supported via multi-backend ensemble
-- **Context-aware detection** - tracks conversation history to resolve ambiguous short messages like "ok", "si", "bien"
-- **Code-switching detection** - identifies mixed-language messages (Spanglish, Franglais, Hinglish)
-- **Slang & abbreviations** - built-in hints for chat lingo ("thx", "mdr", "jaja")
-- **Confusion resolution** - handles similar language pairs (Spanish/Portuguese, Norwegian/Danish/Swedish)
-- **Extensible** - add custom backends, voting strategies, and hint dictionaries
+FastLangML runs several detectors ([fastText](https://fasttext.cc/), [Lingua](https://github.com/pemistahl/lingua-py), [langdetect](https://github.com/Mimino666/langdetect), [langid](https://github.com/saffsd/langid.py), [CLD3](https://github.com/bsolomon1124/pycld3), [fastlangid](https://pypi.org/project/fastlangid/)) and combines their votes. On top of that it adds the things chat text needs:
 
-## Table of Contents
+- **Hint dictionaries** for slang and abbreviations (`thx`, `mdr`, `jaja`)
+- **Conversation context** so earlier messages can inform later ones
+- **Code-switching detection** for mixed messages (Spanglish, Hinglish, ...)
+- **Confusable-pair handling** (Spanish/Portuguese, Norwegian/Danish/Swedish, ...)
+- **An honest "unknown"**: returns `und` with a reason instead of guessing on empty or too-short input
+- **Plug-in points** for your own backends and voting strategies
 
-- [The Problem](#the-problem)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Core Concepts](#core-concepts)
-  - [Context-Aware Detection](#context-aware-detection)
-  - [Persisting Context](#persisting-context)
-  - [Multi-Backend Ensemble](#multi-backend-ensemble)
-  - [Voting Strategies](#voting-strategies)
-  - [Hint Dictionaries](#hint-dictionaries)
-- [API Reference](#api-reference)
-- [Configuration](#configuration)
-- [Extensibility](#extensibility)
-  - [Custom Backends](#custom-backends)
-  - [Custom Voting Strategies](#custom-voting-strategies)
-  - [Language Confusion Resolution](#language-confusion-resolution)
-  - [Code-Switching Detection](#code-switching-detection)
-- [Benchmarks](#benchmarks)
-- [Best Practices](#best-practices)
-- [Contributing](#contributing)
-- [License](#license)
+```python
+from fastlangml import detect
+
+detect("Bonjour") == "fr"   # True
+```
+
+## Contents
+
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Command line](#command-line)
+- [Conversations](#conversations)
+- [Configuring the detector](#configuring-the-detector)
+- [Advanced features](#advanced-features)
+- [API reference](#api-reference)
+- [Performance](#performance)
+- [Development](#development)
 
 ---
 
-## The Problem
+## Install
 
-Traditional language detectors are trained on well-formed sentences and documents. They fail on the kind of text you see in real conversations:
-
-```
-"Bonjour!"       -> French (correct)
-"Comment ca va?" -> French (correct)
-"Bien"           -> Spanish? French? German? (WRONG)
-"ok"             -> English? Universal? (AMBIGUOUS)
-"thx"            -> Unknown (FAIL)
-```
-
-**Why this happens:**
-- Short text has low statistical signal
-- Words like "ok", "taxi", "pizza" exist in many languages
-- Chat slang ("thx", "mdr", "jaja") isn't in training data
-- No context from surrounding messages
-
-**FastLangML solves this** by:
-1. Tracking conversation context to disambiguate short messages
-2. Using hint dictionaries for slang and common words
-3. Combining multiple detection backends for robustness
-4. Returning "unknown" (`und`) when uncertain instead of wrong guesses
-
----
-
-## Installation
+FastLangML has no detection backend by default. Install at least one:
 
 ```bash
-# Full installation with all backends (recommended)
-pip install fastlangml[all]
-
-# Minimal installation (fasttext only)
-pip install fastlangml[fasttext]
-
-# Pick specific backends
-pip install fastlangml[fasttext,lingua]
-pip install fastlangml[langdetect]
+pip install "fastlangml[all]"               # every backend and optional feature
+pip install "fastlangml[fasttext,lingua]"   # a good, smaller combination
 ```
 
-**Available backends:**
-
-| Backend | Languages | Speed | Accuracy | Install Extra |
-|---------|-----------|-------|----------|---------------|
-| fasttext | 176 | Fast | High | `[fasttext]` |
-| fastlangid | 177 | Fast | High (CJK) | `[fastlangid]` |
-| lingua | 75 | Medium | Very High | `[lingua]` |
-| langdetect | 55 | Fast | Medium | `[langdetect]` |
-| pycld3 | 107 | Very Fast | Medium | `[pycld3]` |
-| langid | 97 | Fast | Medium | `[langid]` |
-
-> **Note:** `fastlangid` provides improved accuracy for Japanese, Korean, Chinese, and Cantonese detection.
-
-**Optional features:**
-
-| Feature | Description | Install Extra |
-|---------|-------------|---------------|
-| spaCy NER | Named entity recognition for proper noun filtering | `[spacy]` |
-| fuzzy | Fuzzy matching for hint dictionaries | `[fuzzy]` |
-| diskcache | Disk-based context storage (local dev) | `[diskcache]` |
-| redis | Redis-based context storage (production) | `[redis]` |
-
----
-
-## Quick Start
-
-### Single-Shot Detection (Most Common)
-
-The simplest API - just pass text, get language back:
-
-```python
-from fastlangml import detect
-
-# Direct comparison
-detect("Hello") == "en"      # True
-detect("Bonjour") == "fr"    # True
-
-# Use as string
-print(detect("Hola"))        # "es"
-f"Language: {detect('Ciao')}"  # "Language: it"
-
-# Full details when needed
-result = detect("Hello, how are you?")
-result.lang        # "en"
-result.confidence  # 0.95
-result.reliable    # True
-```
-
-**That's it!** No context, no stores, no configuration required.
-
-### Usage Modes
-
-FastLangML supports three usage modes - pick what fits your needs:
-
-| Mode | Code | Use Case |
-|------|------|----------|
-| **Single-shot** | `detect("text") == "en"` | One-off detection (most common) |
-| **With context** | `detect("text", context=ctx)` | Multi-turn chat (in-memory) |
-| **With persistence** | `store.session(id)` | Multi-turn across HTTP requests |
-
-```python
-# 1. Single-shot - no setup needed
-from fastlangml import detect
-detect("Bonjour") == "fr"  # True
-
-# 2. Context - optional, for conversations
-from fastlangml import detect, ConversationContext
-ctx = ConversationContext()
-detect("Bonjour", context=ctx)  # tracks history in memory
-detect("ok", context=ctx) == "fr"  # True (uses context)
-
-# 3. Stores - optional, for persistence across requests
-from fastlangml.context import DiskContextStore
-store = DiskContextStore("./data")
-with store.session("user-123") as ctx:
-    detect("Bonjour", context=ctx)
-```
-
-> **Note:** Context and stores are 100% optional. Most users only need single-shot mode.
-
----
-
-### Context-Aware Detection (Optional)
-
-For multi-turn conversations, FastLangML can track context to resolve ambiguous short messages. When you pass a `ConversationContext`, the library:
-1. Remembers the last N detected languages
-2. Uses this history to resolve ambiguous messages
-3. Auto-updates the context after each detection
-
-```python
-from fastlangml import detect, ConversationContext
-
-# Create a context to track the conversation
-context = ConversationContext()
-
-# French conversation
-detect("Bonjour!", context=context)        # "fr" (clear)
-detect("Comment ca va?", context=context)  # "fr" (clear)
-detect("Bien", context=context)            # "fr" <- context helps!
-detect("ok", context=context) == "fr"      # True <- continues French
-
-# The context tracks that this is a French conversation,
-# so ambiguous words resolve to French
-```
-
-**How context resolution works:**
-
-| Message | Without Context | With Context (after French turns) |
-|---------|-----------------|-----------------------------------|
-| "ok" | Ambiguous | French (conversation language) |
-| "Bien" | Spanish/French/German? | French (matches history) |
-| "Si" | Spanish/Italian? | Italian (if conversation was Italian) |
-| "Gracias" | Spanish | Spanish (high confidence, ignores context) |
-
----
-
-## Core Concepts
-
-### Context-Aware Detection
-
-**What is conversation context?**
-
-`ConversationContext` maintains a sliding window of recent language detections. It tracks:
-- The detected language of each message
-- The confidence score of each detection
-- A weighted history favoring recent messages (decay factor)
-
-**Configuration options:**
-
-```python
-context = ConversationContext(
-    max_turns=2,       # Remember last 2 messages (default)
-    decay_factor=0.8,  # Weight recent messages higher
-)
-```
-
-**When context helps:**
-- Ambiguous short messages ("ok", "yes", "no")
-- Words shared across languages ("taxi", "hotel", "pizza")
-- Mixed script input (romanized non-Latin languages)
-
-**When context doesn't help:**
-- Clear language switches (user explicitly changes language)
-- High-confidence detections (context is ignored)
-
-**Example: Customer service routing**
-
-```python
-from fastlangml import detect, ConversationContext
-
-def route_message(messages: list[str]) -> str:
-    """Route conversation to correct language queue."""
-    context = ConversationContext()
-
-    for msg in messages:
-        result = detect(msg, context=context)
-
-    # Return dominant language of conversation
-    return context.dominant_language or "en"
-
-# French customer conversation
-messages = ["Bonjour", "J'ai un probleme", "ok", "merci"]
-queue = route_message(messages)  # Returns "fr"
-```
-
----
-
-### Persisting Context
-
-For multi-turn conversations across requests, persist context using the built-in stores.
-
-**DiskContextStore** (local dev/testing):
-
-```bash
-pip install fastlangml[diskcache]
-```
-
-```python
-from fastlangml import detect
-from fastlangml.context import DiskContextStore
-
-store = DiskContextStore("./contexts", ttl_seconds=3600)
-
-# Context manager - auto-saves on exit
-with store.session(session_id) as ctx:
-    result = detect(text, context=ctx, auto_update=True)
-```
-
-**RedisContextStore** (production):
-
-```bash
-pip install fastlangml[redis]
-```
-
-```python
-from fastlangml import detect
-from fastlangml.context import RedisContextStore
-
-store = RedisContextStore("redis://localhost:6379", ttl_seconds=1800)
-
-with store.session(session_id) as ctx:
-    result = detect(text, context=ctx, auto_update=True)
-```
-
-**DIY storage** (no extra deps):
-
-```python
-# Serialize to your own storage
-data = ctx.to_dict()
-save_to_database(session_id, data)
-
-# Load back
-data = load_from_database(session_id)
-ctx = ConversationContext.from_dict(data)
-
-# Or use lightweight history format
-ctx = ConversationContext.from_history([("fr", 0.95), ("fr", 0.9)])
-```
-
-Stores internally save only `[(lang, confidence), ...]` for efficiency.
-
----
-
-### Multi-Backend Ensemble
-
-FastLangML can combine multiple language detection backends for better accuracy. Each backend has different strengths:
-
-| Backend | Best For | Weaknesses |
-|---------|----------|------------|
-| fasttext | Speed, many languages | Less accurate on short text |
-| lingua | Accuracy, short text | Slower, fewer languages |
-| langdetect | General purpose | Non-deterministic by default |
-| pycld3 | Speed, CLD3 compatibility | Lower accuracy |
-
-**How ensemble works:**
-
-1. Text is sent to all configured backends
-2. Each backend returns a language prediction with confidence
-3. A voting strategy combines the predictions
-4. Final result is the language with highest combined score
-
-```python
-from fastlangml import FastLangDetector, DetectionConfig
-
-# Configure ensemble with 3 backends
-detector = FastLangDetector(
-    config=DetectionConfig(
-        backends=["fasttext", "lingua", "langdetect"],
-        backend_weights={
-            "fasttext": 0.5,   # Trust fasttext most
-            "lingua": 0.35,    # Lingua for accuracy
-            "langdetect": 0.15 # Langdetect as tiebreaker
-        },
-    )
-)
-
-result = detector.detect("Ciao, come stai?")
-print(result)         # "it"
-print(result.backend) # "ensemble"
-```
-
----
-
-### Voting Strategies
-
-Voting strategies determine how to combine predictions from multiple backends.
-
-**Available strategies:**
-
-| Strategy | Description | Best For |
-|----------|-------------|----------|
-| `weighted` | Weighted average of confidence scores | Production (default) |
-| `hard` | Majority vote (each backend = 1 vote) | Equal-trust backends |
-| `soft` | Average of all probabilities | Well-calibrated backends |
-| `consensus` | Require N backends to agree | High-certainty requirements |
-
-**Weighted Voting (Default)**
-
-Multiplies each backend's confidence by its weight, then picks the language with highest weighted score.
-
-```python
-from fastlangml import FastLangDetector, DetectionConfig
-
-detector = FastLangDetector(
-    config=DetectionConfig(
-        voting_strategy="weighted",
-        backend_weights={
-            "fasttext": 0.6,
-            "lingua": 0.4,
-        },
-    )
-)
-```
-
-**Hard Voting**
-
-Each backend gets one vote. Ties broken by confidence.
-
-```python
-detector = FastLangDetector(
-    config=DetectionConfig(voting_strategy="hard")
-)
-```
-
-**Consensus Voting**
-
-Only returns a result if at least N backends agree. Useful when you need high certainty.
-
-```python
-from fastlangml import ConsensusVoting, FastLangDetector, DetectionConfig
-
-detector = FastLangDetector(
-    config=DetectionConfig(
-        custom_voting=ConsensusVoting(min_agreement=2)
-    )
-)
-```
-
----
-
-### Hint Dictionaries
-
-Hints are word-to-language mappings that override backend detection. Essential for:
-- Chat slang ("thx" -> English, "mdr" -> French)
-- Company-specific terms
-- Ambiguous words you want to force
-
-**Built-in hints for short text:**
-
-```python
-from fastlangml import FastLangDetector, HintDictionary
-
-# Load default hints for chat/SMS
-hints = HintDictionary.default_short_words()
-
-detector = FastLangDetector(hints=hints)
-detector.detect("thx")   # "en" (thanks)
-detector.detect("mdr")   # "fr" (mort de rire = LOL)
-detector.detect("jaja")  # "es" (Spanish laugh)
-```
-
-**Adding custom hints:**
+Include **fastText** if you detect single words or very short messages. On a set of common greetings ("Hello", "Hola", "Ciao", "Merci", ...), `fasttext` + `lingua` got 8 of 8 right. `lingua`, `langid` and `langdetect` without fastText got 3 of 8. All backends do well on full sentences.
+
+| Extra | Backend | Languages | Notes |
+|-------|---------|-----------|-------|
+| `fasttext` | fastText (`lid.176`) | 176 | Fast, broad coverage. Pins `numpy<2`. |
+| `lingua` | Lingua | 75 | Most accurate on short text; slower. |
+| `fastlangid` | fastlangid | 177 | Better on Chinese, Japanese, Korean, Cantonese. |
+| `langdetect` | langdetect | 55 | |
+| `langid` | langid.py | 97 | |
+| `pycld3` | Google CLD3 | 107 | Needs `protobuf` system libraries to build. |
+
+Optional features:
+
+| Extra | Adds |
+|-------|------|
+| `diskcache` | `DiskContextStore` — save conversation context to disk |
+| `redis` | `RedisContextStore` — save conversation context to Redis |
+| `spacy` | spaCy named-entity filtering of proper nouns |
+| `fuzzy` | Fuzzy matching for hint dictionaries |
+
+Check what is installed:
 
 ```python
 from fastlangml import FastLangDetector
 
-detector = FastLangDetector()
-
-# Add hints for your domain
-detector.add_hint("asap", "en")
-detector.add_hint("btw", "en")
-detector.add_hint("stp", "fr")  # s'il te plait
-
-# Hints override backend detection
-detector.detect("asap")  # "en"
+FastLangDetector().available_backends   # e.g. ['fasttext', 'lingua', 'langdetect']
 ```
-
-**Hint priority:**
-
-Hints are checked before backend detection. If a hint matches:
-1. The hint's language gets a confidence boost
-2. For very short text (<=5 chars), hints dominate the result
-3. For longer text, hints are weighted with backend predictions
 
 ---
 
-## API Reference
-
-### detect()
-
-The main function for language detection.
+## Quick start
 
 ```python
-def detect(
-    text: str,
-    context: ConversationContext | None = None,
-    mode: str = "default",
-    auto_update: bool = True,
-) -> DetectionResult
+from fastlangml import detect
+
+result = detect("Hello, how are you?")
+
+result.lang         # "en"
+result.confidence   # 1.0
+result.reliable     # True
+result.backend      # "ensemble"
 ```
 
-**Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `text` | `str` | required | Text to detect |
-| `context` | `ConversationContext` | `None` | Conversation context for multi-turn |
-| `mode` | `str` | `"default"` | Detection mode: `"short"`, `"default"`, `"long"` |
-| `auto_update` | `bool` | `True` | Automatically add result to context |
-
-**Returns:** `DetectionResult`
-
-### DetectionResult
+A `DetectionResult` compares and prints like its language code, so you can use it as a string:
 
 ```python
-@dataclass
-class DetectionResult:
-    lang: str           # ISO 639-1 code ("en", "fr", "und")
-    confidence: float   # 0.0 to 1.0
-    reliable: bool      # True if confidence >= threshold
-    reason: str | None  # Why "und" was returned (if applicable)
-    script: str | None  # Detected script ("latin", "cyrillic", etc.)
-    backend: str        # Which backend or "ensemble"
-    candidates: list    # Top-k alternatives
-    meta: dict          # Timing and debug info
-
-# Can be used directly as string
-detect("Hello") == "en"      # True (via __eq__)
-print(detect("Bonjour"))     # "fr" (via __str__)
-f"{detect('Hola')}"          # "es"
+detect("Hello") == "en"        # True
+str(detect("Hola"))            # "es"
+f"{detect('Ciao')}"            # "it"
 ```
 
-### ConversationContext
+When there is nothing to detect, you get `und` and a reason:
 
 ```python
-context = ConversationContext(
-    max_turns: int = 2,      # Max messages to remember
-    decay_factor: float = 0.8, # Recency weight (0.0-1.0)
-)
-
-# Properties
-context.dominant_language    # Most common language in history
-context.language_distribution # {lang: weighted_count}
-context.last_turn           # Most recent turn
-
-# Methods
-context.get_context_boost(lang)  # Get boost score for a language
-context.get_language_streak()    # (lang, streak_count)
-context.clear()                  # Reset context
+detect("").lang, detect("").reason             # ("und", "empty_text")
+detect("12345").lang, detect("12345").reason   # ("und", "too_little_text")
 ```
 
-### FastLangDetector
+More options:
 
 ```python
+detect("Bonjour le monde", top_k=3).candidates   # ranked alternatives
+detect("Hello", allowed_langs=["en", "fr"])      # only consider these languages
+detect("Some longer paragraph ...", mode="long") # stricter threshold
+
+from fastlangml import detect_batch
+detect_batch(["Hello there", "Bonjour à tous"])  # list of results
+```
+
+`confidence` is the winning language's share of the combined backend vote: 1.0 when every backend agrees, about 0.5 when two languages split the vote. `mode` sets the minimum text length and how much of the vote the winner needs. Below that, you get `und` with reason `low_confidence` (or `disagreement` when the top two are close).
+
+| Mode | Use for | Confidence threshold |
+|------|---------|----------------------|
+| `"short"` | Chat, SMS, single words (default for `detect()`) | 0.3 |
+| `"default"` | Sentences | 0.5 |
+| `"long"` | Paragraphs, documents | 0.6 |
+
+---
+
+## Command line
+
+Installing the package adds a `fastlangml` command.
+
+```bash
+fastlangml detect "Bonjour le monde"
+# {"lang":"fr","confidence":1.0,"reliable":true,"script":"Latin","text":"Bonjour le monde"}
+
+echo "Hola amigo" | fastlangml detect -          # read from stdin
+fastlangml detect --top-k 3 --short "ok"
+fastlangml -f table "Guten Morgen zusammen"        # json | jsonl | table
+fastlangml "Bonjour"                              # `detect` is the default command
+fastlangml batch messages.txt                    # one text per line
+fastlangml backends                              # list installed backends
+fastlangml bench --dataset wili --n-samples 1000 # accuracy benchmark
+```
+
+Output options (`-f/--format`, `-p/--pretty`, `--include-meta`) work before or after the command. Run `fastlangml <command> --help` for all flags.
+
+---
+
+## Conversations
+
+### Context
+
+Pass a `ConversationContext` to remember the languages of recent messages. By default, `detect()` adds each result to the context for you.
+
+```python
+from fastlangml import ConversationContext, detect
+
+ctx = ConversationContext(max_turns=10)
+
+for message in ["Bonjour", "J'ai un problème avec ma commande", "ok", "merci"]:
+    detect(message, context=ctx)
+
+ctx.dominant_language       # "fr"
+ctx.language_distribution   # {"fr": 0.74, "en": 0.26}
+```
+
+How it works: each candidate language gets a small score boost based on how often it appeared in recent turns (newer turns count more, set by `decay_factor`). The boost is deliberately small (at most `0.3 × context_weight`, which is 0.06 with defaults). It only breaks near-ties between languages the backends already suggested. It never overrides a confident detection. To make context count for more, raise `DetectionConfig.context_weight`.
+
+A common use is routing a whole conversation by `ctx.dominant_language` rather than trusting any single short message.
+
+> **Note:** `detect()` updates the context by default (`auto_update=True`). `FastLangDetector.detect()` does **not** (`auto_update=False`). Pass `auto_update=True`, or call `ctx.add_turn(text, result.lang, result.confidence)` yourself.
+>
+> Undetermined results (`und`) are never added to the context, so empty or noisy messages don't push real history out.
+
+### Saving context between requests
+
+For web apps, where each message arrives in a separate request, save the context per session.
+
+```python
+from fastlangml import detect
+from fastlangml.context import DiskContextStore    # pip install "fastlangml[diskcache]"
+
+store = DiskContextStore("./contexts", ttl_seconds=3600)
+
+with store.session("user-123") as ctx:              # loads, then saves on exit
+    detect("Bonjour tout le monde", context=ctx)
+```
+
+For production, use Redis. The interface is the same:
+
+```python
+from fastlangml.context import RedisContextStore   # pip install "fastlangml[redis]"
+
+store = RedisContextStore("redis://localhost:6379", ttl_seconds=1800)
+```
+
+Both stores take `max_turns` (default 5). To use your own storage instead, serialize the context:
+
+```python
+data = ctx.to_dict()                                   # JSON-safe dict
+ctx = ConversationContext.from_dict(data)
+ctx = ConversationContext.from_history([("fr", 0.95), ("fr", 0.9)])
+```
+
+---
+
+## Configuring the detector
+
+`detect()` uses a shared default detector. To configure one, create a `FastLangDetector`:
+
+```python
+from fastlangml import DetectionConfig, FastLangDetector
+
 detector = FastLangDetector(
-    config=DetectionConfig(...),
-    hints=HintDictionary(),
+    config=DetectionConfig(
+        backends=["fasttext", "lingua", "langdetect"],   # empty = use all installed
+        backend_weights={"fasttext": 0.5, "lingua": 0.35, "langdetect": 0.15},
+        voting_strategy="weighted",
+    )
 )
 
-# Methods
-detector.detect(text, context=None, mode="default")
-detector.detect_batch(texts, mode="default")
-detector.add_hint(word, lang)
-detector.remove_hint(word)
-detector.set_languages(["en", "fr", "es"])  # Restrict output
-detector.available_backends()
+detector.detect("Ciao, come stai?")   # "it"
 ```
+
+### Voting strategies
+
+| Strategy | How it combines backends |
+|----------|--------------------------|
+| `"weighted"` (default) | Sum of confidence × backend weight |
+| `"hard"` | One vote per backend; ties broken by confidence |
+| `"soft"` | Average of backend probabilities |
+| `"consensus"` | Only answers when enough backends agree |
+
+```python
+from fastlangml import ConsensusVoting
+
+FastLangDetector(config=DetectionConfig(voting_strategy="hard"))
+FastLangDetector(config=DetectionConfig(custom_voting=ConsensusVoting(min_agreement=2)))
+```
+
+### Hints
+
+Hints map words to languages. Backends are trained on full sentences and often miss chat slang, so hints fill the gap. Built-in chat hints are **not** enabled by default; load them explicitly:
+
+```python
+from fastlangml import FastLangDetector, HintDictionary
+
+detector = FastLangDetector(hints=HintDictionary.default_short_words())
+
+detector.detect("thx")    # "en"
+detector.detect("mdr")    # "fr"  (mort de rire, "LOL")
+detector.detect("jaja")   # "es"
+```
+
+Add your own:
+
+```python
+detector.add_hint("stp", "fr")    # s'il te plaît
+detector.detect("stp")            # "fr"
+detector.remove_hint("stp")
+```
+
+In `"short"` mode, text of 5 characters or fewer is mostly decided by hints. For longer text, hints add a boost scaled by `hint_weight`.
+
+### Restricting languages
+
+If you know the possible answers, for example a bilingual support queue:
+
+```python
+detector.set_languages(["en", "es"])
+```
+
+### All `DetectionConfig` options
+
+| Option | Default | Meaning |
+|--------|---------|---------|
+| `mode` | `"default"` | Default mode for `FastLangDetector.detect()` |
+| `backends` | `[]` | Backends to use; empty means all installed |
+| `backend_weights` | `{}` | Per-backend weight for weighted voting |
+| `voting_strategy` | `"weighted"` | `"weighted"`, `"hard"`, `"soft"`, `"consensus"` |
+| `custom_voting` | `None` | A `VotingStrategy` instance; overrides `voting_strategy` |
+| `thresholds` | `{"short": 0.3, "default": 0.5, "long": 0.6}` | Share of the vote the winner needs; below it the result is `und` |
+| `min_chars` | `{"short": 2, "default": 3, "long": 3}` | Shorter text returns `und` |
+| `min_letters` | `{"short": 1, "default": 2, "long": 2}` | Fewer letters returns `und` |
+| `min_letter_ratio` | `0.3` | Minimum share of letters in the text |
+| `unknown_policy` | `{"allow": True, "label": "und"}` | Whether and how to return "unknown" |
+| `normalize` | `True` | Unicode normalization |
+| `strip_noise` | `True` | Remove URLs, emails, and similar before detecting |
+| `filter_proper_nouns` | `True` | Remove likely names before detecting |
+| `proper_noun_strategy` | `"remove"` | `"remove"`, `"mask"`, or `"none"` |
+| `use_script_filter` | `True` | Use the writing system (Hangul, Thai, ...) to answer early |
+| `cache_size` | `1000` | LRU cache size for repeated texts |
+| `hint_weight` | `0.3` | Strength of hint boosts |
+| `context_weight` | `0.2` | Strength of conversation-context boosts |
 
 ---
 
-## Configuration
+## Advanced features
 
-### DetectionConfig
+### Code-switching
+
+Detect messages that mix languages:
 
 ```python
-from fastlangml import DetectionConfig
+from fastlangml import CodeSwitchDetector
 
-config = DetectionConfig(
-    # Backend configuration
-    backends=["fasttext", "lingua"],
-    backend_weights={"fasttext": 0.6, "lingua": 0.4},
+cs = CodeSwitchDetector()
+result = cs.detect("That's muy importante for the proyecto")
 
-    # Voting
-    voting_strategy="weighted",  # or "hard", "soft", "consensus"
-    custom_voting=None,          # VotingStrategy instance
+result.is_mixed                # True
+result.primary_language        # "en"
+result.secondary_languages     # ["es"]
+result.language_distribution   # {"en": 0.6, "es": 0.4}
 
-    # Thresholds
-    thresholds={
-        "short": 0.5,   # Confidence threshold for short mode
-        "default": 0.7,
-        "long": 0.8,
-    },
-    min_text_length=1,
+for span in result.spans:
+    print(span.text, span.language, span.confidence)
 
-    # Features
-    filter_proper_nouns=False,  # Enable heuristic-based proper noun filtering
-    use_script_filter=True,
-
-    # spaCy NER for proper noun filtering (requires pip install fastlangml[spacy])
-    # filter = ProperNounFilter(use_spacy=True)
-    # Filters: PERSON, ORG, GPE, LOC, FAC, NORP entities
-
-    # Weights
-    hint_weight=1.5,
-    context_weight=0.3,
-)
+cs.is_code_switched("Hello world")          # False
+cs.is_code_switched("Hola, how are you?")   # True
 ```
 
----
+### Confusable languages
 
-## Extensibility
+Some languages are hard to tell apart. `ConfusionResolver` uses distinguishing words to adjust scores for these pairs:
 
-### Custom Backends
-
-Create your own detection backend using the `@backend` decorator:
+Spanish/Portuguese · Norwegian/Danish/Swedish · Czech/Slovak · Croatian/Serbian/Bosnian · Indonesian/Malay · Russian/Ukrainian/Belarusian · Hindi/Urdu
 
 ```python
-from fastlangml import backend, Backend
+from fastlangml import ConfusionResolver, LanguageSimilarity
+
+resolver = ConfusionResolver()
+resolver.resolve("Eu tenho um problema", {"es": 0.45, "pt": 0.42})
+# {"es": 0.45, "pt": 0.62}   Portuguese boosted ("tenho")
+
+LanguageSimilarity().are_related("es", "pt")   # True
+```
+
+### Custom backends
+
+```python
+from fastlangml import Backend, DetectionConfig, FastLangDetector, backend
 from fastlangml.backends.base import DetectionResult
 
-@backend("my_detector", reliability=4)  # reliability: 1-5
-class MyBackend(Backend):
-    """Custom language detection backend."""
 
+@backend("my_detector", reliability=4)   # reliability: 1 (low) to 5 (high)
+class MyBackend(Backend):
     @property
     def name(self) -> str:
         return "my_detector"
 
     @property
     def is_available(self) -> bool:
-        # Check if required dependencies are installed
-        return True
+        return True   # e.g. check that your dependency imports
 
     def detect(self, text: str) -> DetectionResult:
-        # Your detection logic here
-        lang = "en"  # Replace with actual detection
-        confidence = 0.95
-        return DetectionResult(self.name, lang, confidence)
+        return DetectionResult(self.name, "en", 0.95)
 
     def supported_languages(self) -> set[str]:
-        return {"en", "fr", "de", "es"}
+        return {"en", "fr"}
+
+
+detector = FastLangDetector(config=DetectionConfig(backends=["my_detector", "fasttext"]))
 ```
 
-**Using the custom backend:**
+You can also register without the decorator: `register_backend(name, cls, reliability=3)`, `unregister_backend(name)`, `list_registered_backends()`.
+
+Note that `fastlangml.backends.base.DetectionResult` is a backend's raw vote (`backend_name`, `language`, `confidence`). It is different from `fastlangml.DetectionResult`, the final result returned by `detect()`.
+
+### Custom voting
 
 ```python
-from fastlangml import FastLangDetector, DetectionConfig
+from fastlangml import VotingStrategy
 
-detector = FastLangDetector(
-    config=DetectionConfig(
-        backends=["my_detector", "fasttext"],
-    )
-)
-```
 
-**Programmatic registration:**
+class HighestConfidence(VotingStrategy):
+    """Score each language by its single most confident backend."""
 
-```python
-from fastlangml import register_backend, unregister_backend, list_registered_backends
-
-# Register
-register_backend("my_backend", MyBackend, reliability=4)
-
-# List all registered
-print(list_registered_backends())  # ["my_backend"]
-
-# Unregister
-unregister_backend("my_backend")
-```
-
----
-
-### Custom Voting Strategies
-
-Implement your own voting logic by extending `VotingStrategy`:
-
-```python
-from fastlangml import VotingStrategy, FastLangDetector, DetectionConfig
-
-class ConfidenceOnlyVoting(VotingStrategy):
-    """Pick the language with highest individual confidence."""
-
-    def vote(
-        self,
-        results: list,
-        weights: dict[str, float] | None = None,
-    ) -> dict[str, float]:
-        if not results:
-            return {}
-
-        # Find max confidence per language
-        scores = {}
+    def vote(self, results, weights=None) -> dict[str, float]:
+        scores: dict[str, float] = {}
         for r in results:
-            lang = r.language
-            if lang not in scores or r.confidence > scores[lang]:
-                scores[lang] = r.confidence
-
+            scores[r.language] = max(scores.get(r.language, 0.0), r.confidence)
         return scores
 
-# Use custom voting
-detector = FastLangDetector(
-    config=DetectionConfig(
-        custom_voting=ConfidenceOnlyVoting()
-    )
-)
+
+detector = FastLangDetector(config=DetectionConfig(custom_voting=HighestConfidence()))
 ```
 
 ---
 
-### Language Confusion Resolution
+## API reference
 
-FastLangML handles commonly confused language pairs with specialized logic:
-
-**Supported confused pairs:**
-- Spanish / Portuguese
-- Norwegian / Danish / Swedish
-- Czech / Slovak
-- Croatian / Serbian / Bosnian
-- Indonesian / Malay
-- Russian / Ukrainian / Belarusian
-- Hindi / Urdu
+### `detect()`
 
 ```python
-from fastlangml import ConfusionResolver, LanguageSimilarity
-
-# Resolve ambiguity between similar languages
-resolver = ConfusionResolver()
-
-# Check if languages are a known confused pair
-pair = resolver.get_confused_pair({"es", "pt"})  # frozenset({"es", "pt"})
-
-# Adjust scores based on discriminating features
-scores = {"es": 0.45, "pt": 0.42}
-adjusted = resolver.resolve("Eu tenho um problema", scores)
-# Portuguese boosted due to "tenho" (have)
-
-# Get discriminating features
-es_features, pt_features = resolver.get_discriminating_features("es", "pt")
-# es_features: ["pero", "cuando", "donde", ...]
-# pt_features: ["mas", "quando", "onde", ...]
-
-# Check language relationships
-sim = LanguageSimilarity()
-sim.are_related("es", "pt")  # True (Romance family)
-sim.are_related("en", "zh")  # False (different families)
-sim.get_related_languages("es")  # {"pt", "fr", "it", "ro", "ca", "gl"}
+detect(
+    text: str,
+    *,
+    context: ConversationContext | None = None,
+    mode: Literal["short", "default", "long"] = "short",
+    top_k: int = 1,
+    allowed_langs: list[str] | None = None,
+    auto_update: bool = True,
+) -> DetectionResult
 ```
 
----
-
-### Code-Switching Detection
-
-Detect mixed-language messages (Spanglish, Franglais, Hinglish, etc.):
+### `FastLangDetector`
 
 ```python
-from fastlangml import CodeSwitchDetector
+detector = FastLangDetector(config: DetectionConfig | None = None, hints: HintDictionary | None = None)
 
-detector = CodeSwitchDetector()
-
-# Detect code-switching
-result = detector.detect("That's muy importante for the proyecto")
-
-result.is_mixed            # True
-result.primary_language    # "en"
-result.secondary_languages # ["es"]
-result.languages           # ["en", "es"]
-result.language_distribution  # {"en": 0.6, "es": 0.4}
-
-# Get language spans
-for span in result.spans:
-    print(f"{span.text}: {span.language} ({span.confidence:.2f})")
-# "That's": en (0.85)
-# "muy": es (0.92)
-# "importante": es (0.95)
-# "for": en (0.88)
-# "the": en (0.90)
-# "proyecto": es (0.94)
-
-# Quick check
-detector.is_code_switched("Hello world")  # False
-detector.is_code_switched("Hola, how are you?")  # True
-
-# Pattern-based detection
-from fastlangml import detect_code_switching_pattern
-
-pattern = detect_code_switching_pattern("That's muy bueno")
-# ("en", "es") - matches Spanglish pattern
+detector.detect(text, *, top_k=1, mode=None, allowed_langs=None,
+                filter_proper_nouns=None, context=None, hints=None, auto_update=False)
+detector.detect_batch(texts, mode=...)
+detector.add_hint(word, lang)
+detector.remove_hint(word)
+detector.set_languages(["en", "fr"])
+detector.available_backends    # property: list of installed backends
+detector.cache_stats           # property: {"size": ..., "maxsize": ...}
 ```
 
-**Supported code-switching patterns:**
-- Spanglish (English + Spanish)
-- Franglais (English + French)
-- Hinglish (English + Hindi)
-- Denglish (German + English)
+### `DetectionResult`
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `lang` | `str` | ISO 639-1 code, or `"und"` |
+| `confidence` | `float` | Winner's share of the backend vote, 0.0 – 1.0 |
+| `reliable` | `bool` | `confidence` ≥ the mode's threshold |
+| `reason` | `str \| None` | Why the result is `und` |
+| `script` | `str \| None` | Writing system, e.g. `"Latin"` |
+| `backend` | `str` | Backend name, or `"ensemble"` |
+| `candidates` | `list[Candidate]` | Ranked alternatives when `top_k > 1` |
+| `meta` | `dict` | Timing and per-backend scores |
+
+### `ConversationContext`
+
+```python
+ctx = ConversationContext(max_turns=2, decay_factor=0.9)
+
+ctx.add_turn(text, detected_language, confidence)
+ctx.dominant_language        # most likely language, or None
+ctx.language_distribution    # {lang: weight}, sums to 1.0
+ctx.last_turn
+ctx.turns
+ctx.get_language_streak()    # (lang, count)
+ctx.clear()
+ctx.to_dict() / ConversationContext.from_dict(d) / ConversationContext.from_history(pairs)
+```
 
 ---
 
-## Benchmarks
+## Performance
 
-### Accuracy
+- **Cache:** repeated texts are served from an LRU cache (`cache_size`). Calls that pass a `context` or per-call `hints` skip the cache, since those can change the result. `add_hint()` and `remove_hint()` clear the cache.
+- **Script short-circuit:** text in a writing system used by only one language (Korean, Thai, Hebrew, Armenian, Georgian, Tamil, Telugu, Kannada, Malayalam, Gujarati, Bengali, Punjabi, Oriya, Sinhala, Khmer, Lao, Myanmar, Tibetan) is answered without running any backend.
+- **Lazy loading:** backends load their models on first use. Expect the first call to take a few seconds; later calls take milliseconds.
+- **Batching:** `detect_batch()` runs texts in parallel and is faster than calling `detect()` in a loop. Pass `max_workers=` to cap the number of threads.
 
-Tested across standard language samples, short text, and CJK:
-
-| Test Category | Accuracy | Notes |
-|---------------|----------|-------|
-| Standard Languages (25 samples) | **96.0%** | Full sentences across 25 languages |
-| Short Text (16 samples) | **100.0%** | Single words like "Hello", "Bonjour", "안녕" |
-| CJK (6 samples) | **100.0%** | Japanese, Chinese, Korean sentences |
-
-### Backend Comparison
-
-FastLangML ensemble outperforms individual backends:
-
-| Backend | Accuracy | Avg Latency |
-|---------|----------|-------------|
-| **ensemble** | **100.0%** | 8.28ms |
-| fasttext | 100.0% | 0.01ms |
-| lingua | 90.0% | 0.18ms |
-| langdetect | 80.0% | 2.84ms |
-| langid | 70.0% | 0.56ms |
-
-### Performance
-
-| Operation | Latency | Notes |
-|-----------|---------|-------|
-| Initialization | ~100ms | One-time, first detection |
-| First detection (cold) | ~3000ms | Loads all backend models |
-| Warm detection | **8.28ms** | Average per detection |
-| Cache hit | **0.0006ms** | ~10,000x faster |
-| Script short-circuit | **0.0006ms** | Korean, Thai, Hebrew, etc. |
-| Batch (100 texts) | 550ms | ~182 texts/sec |
-
-### Optimizations
-
-FastLangML includes several performance optimizations:
-
-| Optimization | Speedup | Description |
-|--------------|---------|-------------|
-| Script short-circuit | ~5,500x | Skip backends for unambiguous scripts (Hangul→ko, Thai→th) |
-| Result caching | ~10,000x | LRU cache for repeated texts |
-| Lazy backend loading | - | Only load backends when needed |
-| Adaptive parallelism | - | Skip threading for ≤2 backends or short text |
-
-**Script short-circuit languages:**
-- Korean (Hangul), Thai, Hebrew, Armenian, Georgian
-- Tamil, Telugu, Kannada, Malayalam, Gujarati, Bengali, Punjabi, Oriya, Sinhala
-- Khmer, Lao, Myanmar, Tibetan
-
-### Running Benchmarks
+Run the benchmark on your own data and hardware:
 
 ```bash
-# Run accuracy benchmarks
+fastlangml bench --dataset wili --n-samples 1000 --out report.json
 pytest tests/test_benchmarks.py -v
-
-# Quick performance check
-python -c "
-from fastlangml import detect
-import time
-
-start = time.perf_counter()
-for i in range(100):
-    detect(f'Hello world {i}')
-print(f'100 detections: {(time.perf_counter()-start)*1000:.0f}ms')
-"
 ```
 
 ---
 
-## Best Practices
-
-### 1. Use Context for Chat/Messaging
-
-Always pass a `ConversationContext` when detecting messages in a conversation:
-
-```python
-# Good: Context-aware
-context = ConversationContext()
-for msg in conversation:
-    result = detect(msg, context=context)
-
-# Bad: Stateless detection
-for msg in conversation:
-    result = detect(msg)  # Loses valuable context
-```
-
-### 2. Choose the Right Mode
-
-- **short**: For SMS, chat messages (< 50 chars). Lower confidence threshold.
-- **default**: General purpose. Balanced threshold.
-- **long**: For paragraphs/documents. Higher confidence threshold.
-
-```python
-detect("ok", mode="short")         # More lenient
-detect("Hello world", mode="default")
-detect(long_paragraph, mode="long") # More strict
-```
-
-### 3. Add Domain-Specific Hints
-
-If your users use specific slang or terms, add hints:
-
-```python
-detector.add_hint("gg", "en")     # Gaming
-detector.add_hint("lol", "en")
-detector.add_hint("mdr", "fr")    # French LOL
-detector.add_hint("kek", "en")    # Gaming laugh
-```
-
-### 4. Restrict Languages When Known
-
-If you know the possible languages (e.g., a bilingual support queue), restrict the output:
-
-```python
-# Only consider English and Spanish
-detector.set_languages(["en", "es"])
-```
-
-### 5. Handle "und" (Unknown)
-
-When FastLangML is uncertain, it returns `und` instead of guessing wrong:
-
-```python
-result = detect("ok")
-if result == "und":  # Can compare directly
-    # Fallback to default or ask user
-    lang = result.candidates[0].lang if result.candidates else "en"
-    print(f"Low confidence: {result.reason}")
-```
-
-### 6. Use Ensemble for Production
-
-Single backends have blind spots. Ensemble improves reliability:
-
-```python
-# Development: Fast single backend
-detector = FastLangDetector(
-    config=DetectionConfig(backends=["fasttext"])
-)
-
-# Production: Reliable ensemble
-detector = FastLangDetector(
-    config=DetectionConfig(
-        backends=["fasttext", "lingua"],
-        voting_strategy="weighted",
-    )
-)
-```
-
-### 7. Batch Detection for Throughput
-
-When processing many messages, use batch detection:
-
-```python
-# Good: Batch processing (parallelized)
-results = detector.detect_batch(messages, mode="short")
-
-# Bad: Sequential detection
-results = [detector.detect(msg) for msg in messages]  # Slower
-```
-
----
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-### Quick Start
+## Development
 
 ```bash
-# Clone and setup
 git clone https://github.com/pnrajan/fastlangml.git
 cd fastlangml
-poetry install --all-extras
 
-# Development commands
-make test         # Run tests
-make lint         # Check code style
-make format       # Format code with ruff
-make fix          # Auto-fix linting issues
-make typecheck    # Run type checker
-make check        # Run all checks (format + lint + typecheck + test)
+poetry install --all-extras     # or: pip install -e ".[dev,all]"
+
+make test        # pytest
+make lint        # ruff check
+make format      # ruff format
+make typecheck   # mypy
+make check       # all of the above
 ```
 
-### What We're Looking For
-
-- Bug fixes with test cases
-- New detection backends
-- Performance improvements
-- Documentation improvements
-- New voting strategies
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Project architecture overview
-- Testing guidelines
-- Code style requirements
-- Commit message conventions
-- Pull request process
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture, testing, and pull request guidelines.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).

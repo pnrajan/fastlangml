@@ -1,9 +1,17 @@
 #!/bin/bash
 #
-# Smart commit: analyzes changes vs origin and generates informative commit message
+# Interactive commit helper.
+#
+# Builds a commit message from the *staged* changes only, then lets you
+# commit, commit and push, edit the message, or cancel.
+#
+#   - Nothing staged? Offers to stage modified tracked files (`git add -u`).
+#     Untracked files are never added automatically.
+#   - Cancelling only unstages what this script staged.
+#   - Nothing to commit but unpushed commits? Offers to push them.
 #
 
-set -e
+set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -11,160 +19,195 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Check if we're in a git repo
-if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-    echo -e "${RED}Error: Not in a git repository${NC}"
-    exit 1
-fi
+info() { echo -e "${BLUE}$*${NC}"; }
+ok()   { echo -e "${GREEN}✓ $*${NC}"; }
+warn() { echo -e "${YELLOW}$*${NC}"; }
+die()  { echo -e "${RED}Error: $*${NC}" >&2; exit 1; }
+
+git rev-parse --is-inside-work-tree > /dev/null 2>&1 || die "not in a git repository"
 
 BRANCH=$(git branch --show-current)
-ORIGIN="origin/$BRANCH"
+[ -n "$BRANCH" ] || die "detached HEAD; check out a branch first"
 
-# Check if origin branch exists
-if ! git rev-parse --verify "$ORIGIN" > /dev/null 2>&1; then
-    echo -e "${YELLOW}No remote tracking branch. Comparing against HEAD.${NC}"
-    ORIGIN="HEAD"
+push_branch() {
+    if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' > /dev/null 2>&1; then
+        git push
+    else
+        git push -u origin "$BRANCH"
+    fi
+    ok "Pushed $BRANCH"
+}
+
+# Commits on HEAD that no remote branch contains yet.
+unpushed_count() {
+    git rev-list --count HEAD --not --remotes
+}
+
+# --- Make sure something is staged -------------------------------------------
+
+STAGED_BY_SCRIPT=0
+if git diff --cached --quiet; then
+    if ! git diff --quiet; then
+        warn "Nothing staged. Modified tracked files:"
+        git diff --name-status
+        echo
+        read -r -p "Stage these with 'git add -u'? [y/N]: " STAGE
+        if [[ "$STAGE" =~ ^[Yy]$ ]]; then
+            git add -u
+            STAGED_BY_SCRIPT=1
+        fi
+    fi
 fi
 
-# Stage all changes
-git add -A
-
-# Check for changes
-if git diff --cached --quiet && git diff "$ORIGIN"..HEAD --quiet 2>/dev/null; then
-    echo -e "${YELLOW}No changes to commit${NC}"
+if git diff --cached --quiet; then
+    UNPUSHED=$(unpushed_count)
+    if [ "$UNPUSHED" -gt 0 ]; then
+        warn "Nothing to commit, but $UNPUSHED unpushed commit(s) on $BRANCH."
+        read -r -p "Push now? [y/N]: " PUSH
+        [[ "$PUSH" =~ ^[Yy]$ ]] && push_branch
+    else
+        warn "Nothing to commit."
+    fi
     exit 0
 fi
 
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${BLUE}  Comparing $BRANCH vs $ORIGIN${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
+# --- Analyze staged changes ---------------------------------------------------
+
+info "═══════════════════════════════════════"
+info "  Staged changes on $BRANCH"
+info "═══════════════════════════════════════"
+git diff --cached --name-status
 echo
 
-# Show what's different from origin
-echo -e "${GREEN}Changed files:${NC}"
-git diff --name-status "$ORIGIN" 2>/dev/null || git diff --cached --name-status
-echo
+CHANGES=$(git diff --cached --name-status)
 
-# Collect all changes for analysis
-CHANGES=$(git diff --name-status "$ORIGIN" 2>/dev/null || git diff --cached --name-status)
-DIFF=$(git diff "$ORIGIN" 2>/dev/null || git diff --cached)
+# Lines added in a given path (without the leading '+').
+added_in() {
+    git diff --cached -- "$@" | grep '^+[^+]' | cut -c2- || true
+}
+# True if any of the staged paths match the pattern.
+touched() {
+    cut -f2- <<< "$CHANGES" | grep -E "$1" > /dev/null
+}
+# True if a path with this status (A, M, D, ...) matches the pattern.
+touched_with() {
+    awk -F'\t' -v s="$1" -v p="$2" \
+        'substr($1, 1, 1) == s && $NF ~ p { found = 1 } END { exit !found }' <<< "$CHANGES"
+}
 
-# Analyze changes to build commit message
-MSG_PARTS=()
+TITLE_PARTS=()
+BULLETS=()
 
-# Check for specific patterns in the diff
-if echo "$CHANGES" | grep -q "result.py"; then
-    if echo "$DIFF" | grep -q "__str__\|__eq__"; then
-        MSG_PARTS+=("simplified API with __str__/__eq__")
+if touched 'src/.*\.py$'; then
+    TITLE_PARTS+=("update library code")
+fi
+
+if touched 'pyproject\.toml$'; then
+    PYPROJECT_ADDED=$(added_in pyproject.toml)
+    NEW_VERSION=$(echo "$PYPROJECT_ADDED" | sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' | head -1)
+    if [ -n "$NEW_VERSION" ]; then
+        TITLE_PARTS=("release v$NEW_VERSION" ${TITLE_PARTS[@]+"${TITLE_PARTS[@]}"})
+        BULLETS+=("Bump version to $NEW_VERSION")
     fi
+    BULLETS+=("Update pyproject.toml")
 fi
+touched 'poetry\.lock$' && BULLETS+=("Update poetry.lock")
 
-if echo "$CHANGES" | grep -q "README"; then
-    MSG_PARTS+=("updated README")
-fi
-
-if echo "$CHANGES" | grep -q "CHANGELOG"; then
-    MSG_PARTS+=("updated CHANGELOG")
-fi
-
-if echo "$CHANGES" | grep -q "pyproject.toml\|poetry.lock"; then
-    if echo "$DIFF" | grep -q "twine\|build"; then
-        MSG_PARTS+=("added twine/build for publishing")
-    elif echo "$DIFF" | grep -q "diskcache\|redis"; then
-        MSG_PARTS+=("added storage dependencies")
-    elif echo "$DIFF" | grep -q "version"; then
-        MSG_PARTS+=("version bump")
+if touched '^tests/'; then
+    if touched_with A '^tests/'; then
+        BULLETS+=("Add tests")
     else
-        MSG_PARTS+=("updated dependencies")
+        BULLETS+=("Update tests")
     fi
 fi
 
-if echo "$CHANGES" | grep -q "Makefile"; then
-    if echo "$DIFF" | grep -q "commit"; then
-        MSG_PARTS+=("added commit helper")
-    elif echo "$DIFF" | grep -q "twine"; then
-        MSG_PARTS+=("switched to twine for publishing")
+touched '(^|/)README' && BULLETS+=("Update README")
+touched '(^|/)CHANGELOG' && BULLETS+=("Update CHANGELOG")
+touched '^\.github/' && BULLETS+=("Update CI workflows")
+touched '(^|/)Makefile$' && BULLETS+=("Update Makefile")
+
+if touched '^scripts/'; then
+    while IFS= read -r path; do
+        BULLETS+=("Add $(basename "$path")")
+    done < <(echo "$CHANGES" | awk -F'\t' '$1 == "A" && $2 ~ /^scripts\// {print $2}')
+    touched_with M '^scripts/' && BULLETS+=("Update scripts")
+fi
+
+# --- Build message ------------------------------------------------------------
+
+FILE_COUNT=$(echo "$CHANGES" | grep -c . || true)
+if [ ${#TITLE_PARTS[@]} -eq 0 ]; then
+    if [ "$FILE_COUNT" -eq 1 ]; then
+        TITLE="Update $(echo "$CHANGES" | cut -f2- | tail -1)"
     else
-        MSG_PARTS+=("updated Makefile")
+        TITLE="Update $FILE_COUNT files"
     fi
-fi
-
-if echo "$CHANGES" | grep -q "scripts/"; then
-    NEW_SCRIPTS=$(echo "$CHANGES" | grep "^A.*scripts/" | cut -f2 | xargs -I{} basename {} 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
-    if [ -n "$NEW_SCRIPTS" ]; then
-        MSG_PARTS+=("added $NEW_SCRIPTS script")
-    fi
-fi
-
-if echo "$CHANGES" | grep -q "store.py\|disk_store\|redis_store"; then
-    MSG_PARTS+=("added context persistence stores")
-fi
-
-if echo "$CHANGES" | grep -qE "^A.*test"; then
-    MSG_PARTS+=("added tests")
-fi
-
-if echo "$CHANGES" | grep -qE "^M.*test"; then
-    MSG_PARTS+=("updated tests")
-fi
-
-# Build the message
-if [ ${#MSG_PARTS[@]} -eq 0 ]; then
-    # Fallback: count files
-    FILE_COUNT=$(echo "$CHANGES" | wc -l | tr -d ' ')
-    COMMIT_MSG="Update $FILE_COUNT files"
 else
-    # Join parts with comma
-    COMMIT_MSG=$(IFS=", "; echo "${MSG_PARTS[*]}")
-    # Capitalize first letter
-    COMMIT_MSG="$(echo "${COMMIT_MSG:0:1}" | tr '[:lower:]' '[:upper:]')${COMMIT_MSG:1}"
+    TITLE=""
+    for part in "${TITLE_PARTS[@]}"; do
+        TITLE="${TITLE:+$TITLE, }$part"
+    done
+fi
+TITLE="$(echo "${TITLE:0:1}" | tr '[:lower:]' '[:upper:]')${TITLE:1}"
+
+COMMIT_MSG="$TITLE"
+if [ ${#BULLETS[@]} -gt 0 ]; then
+    COMMIT_MSG+=$'\n'
+    for bullet in "${BULLETS[@]}"; do
+        COMMIT_MSG+=$'\n'"- $bullet"
+    done
 fi
 
-# Show generated message
-echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}Generated commit message:${NC}"
 echo
-echo -e "  ${YELLOW}$COMMIT_MSG${NC}"
-echo
-echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo -e "${YELLOW}${COMMIT_MSG}${NC}"
 echo
 
-# Options
+# --- Act ----------------------------------------------------------------------
+
+cancel() {
+    warn "Cancelled"
+    if [ "$STAGED_BY_SCRIPT" -eq 1 ]; then
+        git reset -q
+    fi
+    exit 0
+}
+
 echo "1) Commit"
 echo "2) Commit and push"
-echo "3) Edit message"
+echo "3) Edit message, then commit"
 echo "4) Cancel"
 echo
-read -p "Select [1-4]: " ACTION
+read -r -p "Select [1-4]: " ACTION
 
-case $ACTION in
+case "$ACTION" in
     1)
         git commit -m "$COMMIT_MSG"
-        echo -e "${GREEN}✓ Committed${NC}"
+        ok "Committed"
         ;;
     2)
         git commit -m "$COMMIT_MSG"
-        git push origin "$BRANCH"
-        echo -e "${GREEN}✓ Committed and pushed${NC}"
+        ok "Committed"
+        push_branch
         ;;
     3)
-        read -p "Enter message: " CUSTOM_MSG
-        if [ -n "$CUSTOM_MSG" ]; then
-            git commit -m "$CUSTOM_MSG"
-            echo -e "${GREEN}✓ Committed${NC}"
-            read -p "Push? [y/N]: " PUSH
-            if [[ "$PUSH" =~ ^[Yy]$ ]]; then
-                git push origin "$BRANCH"
-                echo -e "${GREEN}✓ Pushed${NC}"
-            fi
-        else
-            echo -e "${RED}No message provided${NC}"
-            exit 1
+        MSG_FILE=$(mktemp "${TMPDIR:-/tmp}/commit_msg.XXXXXX")
+        trap 'rm -f "$MSG_FILE"' EXIT
+        printf '%s\n' "$COMMIT_MSG" > "$MSG_FILE"
+        # Same editor git would use (GIT_EDITOR, core.editor, VISUAL, EDITOR);
+        # run through sh like git does so values such as "code --wait" work.
+        sh -c "$(git var GIT_EDITOR)"' "$@"' git-editor "$MSG_FILE"
+        if ! grep -q '[^[:space:]]' "$MSG_FILE"; then
+            cancel
         fi
+        git commit -F "$MSG_FILE"
+        ok "Committed"
+        read -r -p "Push? [y/N]: " PUSH
+        [[ "$PUSH" =~ ^[Yy]$ ]] && push_branch
         ;;
     *)
-        echo -e "${YELLOW}Cancelled${NC}"
-        git reset HEAD > /dev/null 2>&1 || true
-        exit 0
+        cancel
         ;;
 esac
+
+git log --oneline -1

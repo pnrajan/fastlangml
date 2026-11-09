@@ -265,6 +265,7 @@ LANG_NORMALIZATION: dict[str, str] = {
     "zho": "zh",
     "cmn": "zh",
     "yue": "zh-Yue",
+    "zh-yue": "zh-Yue",  # fastlangid's code for Cantonese
     "por": "pt",
     "spa": "es",
     "fra": "fr",
