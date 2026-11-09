@@ -292,6 +292,56 @@ class TestContext:
 
         assert result == "es"
 
+    def test_context_decides_short_word_backends_disagree_on(self, script, make_detector):
+        # "Bien" is French and Spanish; backends lean German. History says Spanish.
+        script.set("Bien", a=("de", 0.6), b=("fr", 0.4))
+        ctx = ConversationContext()
+        ctx.add_turn("Hola, ¿cómo estás?", "es", 0.95)
+        ctx.add_turn("Muy bien gracias", "es", 0.95)
+
+        result = make_detector().detect("Bien", context=ctx, auto_update=True)
+
+        assert result == "es"
+        assert result.reliable is False
+        assert result.meta["from_context"] is True
+        assert len(ctx) == 2  # an echo of the history is not new evidence
+
+    def test_unanimous_backends_beat_context_even_on_short_text(self, script, make_detector):
+        script.set("Hello", ("en", 0.9))
+
+        assert make_detector().detect("Hello", context=_portuguese_history()) == "en"
+
+    def test_context_weighs_less_on_long_text(self, script, make_detector):
+        # Same 55/45 split; context flips the short text but not the long one.
+        short, long_text = "Sim ok", "Tengo una pregunta sobre mi pedido de ayer por favor"
+        for text in (short, long_text):
+            script.set(text, a=("es", 0.9), b=("pt", 0.75))
+        detector = make_detector()
+
+        assert detector.detect(short, context=_portuguese_history()) == "pt"
+        assert detector.detect(long_text, context=_portuguese_history()) == "es"
+
+    def test_too_short_text_follows_conversation_language(self, make_detector):
+        ctx = _portuguese_history()
+
+        result = make_detector().detect("ok", context=ctx, auto_update=True)
+
+        assert result == "pt"
+        assert result.reliable is False
+        assert result.meta["from_context"] is True
+        assert len(ctx) == 2  # a guess from context is not new evidence
+
+    def test_too_short_text_without_context_is_und(self, make_detector):
+        result = make_detector().detect("ok")
+
+        assert result == "und"
+        assert result.reason == Reasons.TOO_LITTLE_TEXT
+
+    def test_context_fallback_respects_allowed_langs(self, make_detector):
+        result = make_detector().detect("ok", context=_portuguese_history(), allowed_langs=["en"])
+
+        assert result == "und"
+
     def test_empty_context_changes_nothing(self, make_detector):
         assert make_detector().detect(NEAR_TIE, context=ConversationContext()) == "es"
 
