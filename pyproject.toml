@@ -1,6 +1,6 @@
 [project]
 name = "fastlangml"
-version = "1.1.0"
+version = "1.2.0"
 description = "FastLangML: High-accuracy language detection for chat, SMS & conversational text. Ensemble of FastText, Lingua, langdetect, CLD3 with context tracking, code-switching detection & 170+ languages."
 readme = "README.md"
 license = "MIT"

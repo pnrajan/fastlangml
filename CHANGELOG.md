@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-09
+
 ### Fixed
 
+- Packaging: `HintDictionary.default_short_words()` returned an empty dictionary
+  for installed copies. A `data/` rule in `.gitignore` kept `default_hints.json`
+  out of git, so it was missing from the published package (1.1.0 included).
+  The file is now tracked and ships in the wheel and sdist.
 - CI: `pip install -e ".[dev]"` installed no test tools because `dev` was only a
   Poetry group. Added a `dev` extra so pytest, ruff, and mypy install in CI.
 - Result cache ignored conversation context. A cached result skipped the context
@@ -268,5 +274,6 @@ pip install fastlangml[fasttext,lingua]
 - **Documentation**: https://github.com/pnrajan/FastLangML#readme
 - **Issues**: https://github.com/pnrajan/FastLangML/issues
 
+[1.2.0]: https://github.com/pnrajan/FastLangML/releases/tag/v1.2.0
 [1.1.0]: https://github.com/pnrajan/FastLangML/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pnrajan/FastLangML/releases/tag/v1.0.0

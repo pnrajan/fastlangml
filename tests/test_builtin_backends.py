@@ -51,3 +51,12 @@ def test_cantonese_tags_normalize_consistently():
 
     # fastText says "yue", fastlangid says "zh-yue"; both mean Cantonese.
     assert normalize_lang_tag("yue") == normalize_lang_tag("zh-yue") == "zh-Yue"
+
+
+def test_default_hints_ship_with_package():
+    # The JSON was once git-ignored, so installed copies got an empty dictionary.
+    from fastlangml import FastLangDetector, HintDictionary
+
+    hints = HintDictionary.default_short_words()
+    assert len(hints) > 1000
+    assert FastLangDetector(hints=hints).detect("thx") == "en"
