@@ -571,6 +571,7 @@ class TestEdgeCaseBenchmarks:
         # Generate long text by repeating
         base = "This is a test sentence in English. "
         long_text = base * 100  # ~3600 chars
+        detector.detect(base)  # load backend models first; time only detection
 
         start = time.perf_counter()
         result = detector.detect(long_text)
