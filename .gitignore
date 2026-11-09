@@ -88,3 +88,6 @@ Thumbs.db
 hints.json
 hints.toml
 /.claude/
+
+# Serena (local code-tool state)
+.serena/
