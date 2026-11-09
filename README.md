@@ -161,10 +161,16 @@ for message in ["Bonjour", "J'ai un problème avec ma commande", "ok", "merci"]:
     detect(message, context=ctx)
 
 ctx.dominant_language       # "fr"
-ctx.language_distribution   # {"fr": 0.74, "en": 0.26}
+ctx.language_distribution   # mostly "fr", e.g. {"fr": 0.84, "en": 0.16}
 ```
 
-How it works: each candidate language gets a small score boost based on how often it appeared in recent turns (newer turns count more, set by `decay_factor`). The boost is deliberately small (at most `0.3 × context_weight`, which is 0.06 with defaults). It only breaks near-ties between languages the backends already suggested. It never overrides a confident detection. To make context count for more, raise `DetectionConfig.context_weight`.
+How it works: the conversation votes alongside the backends. Each language's vote comes from how often it appeared in recent turns (newer turns count more, set by `decay_factor`). How much that vote counts depends on how much the text says on its own:
+
+- **Full sentences** (20+ letters): context gets `0.3 × context_weight` of the vote (0.06 with defaults). It only breaks near-ties.
+- **Short replies** ("Bien", "Gut", "merci"): context counts for more, up to 45% of the vote for words of 4 letters or fewer. It never reaches half, so if every backend agrees on another language, the backends win.
+- **Too short to read** ("ok", "si"): you get the conversation's main language instead of `und`.
+
+When the conversation picks the answer and the score is below the mode's threshold, the result has `reliable=False` and `meta["from_context"] = True`, and it is not added back to the context. To make context count for more on longer text, raise `DetectionConfig.context_weight`.
 
 A common use is routing a whole conversation by `ctx.dominant_language` rather than trusting any single short message.
 
@@ -291,7 +297,7 @@ detector.set_languages(["en", "es"])
 | `use_script_filter` | `True` | Use the writing system (Hangul, Thai, ...) to answer early |
 | `cache_size` | `1000` | LRU cache size for repeated texts |
 | `hint_weight` | `0.3` | Strength of hint boosts |
-| `context_weight` | `0.2` | Strength of conversation-context boosts |
+| `context_weight` | `0.2` | How much conversation history counts on full sentences (short text gets more) |
 
 ---
 
